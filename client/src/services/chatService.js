@@ -25,8 +25,12 @@ export const chatService = {
   },
 
   // Pipeline Step 1: Enhance Topic
-  async enhanceTopic(message) {
-    const res = await api.post('/chat/enhance', { message }, { timeout: 150000 });
+  async enhanceTopic(message, options = {}) {
+    const res = await api.post('/chat/enhance', {
+      message,
+      slideCount: options.slideCount,
+      language: options.language,
+    }, { timeout: 150000 });
     return res.data;
   },
 

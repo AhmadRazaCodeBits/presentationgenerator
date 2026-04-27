@@ -1,23 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { presentationService } from '../services/presentationService';
 
-const TEMPLATE_DATA = [
-  { id: 'modern-gradient', name: 'Modern Gradient', category: 'Business', colors: ['#6C63FF', '#FF6B6B'], desc: 'Clean gradient design for corporate presentations.' },
-  { id: 'dark-professional', name: 'Dark Professional', category: 'Business', colors: ['#1a1a2e', '#e94560'], desc: 'Sleek dark theme for tech and business pitches.' },
-  { id: 'ocean-breeze', name: 'Ocean Breeze', category: 'Education', colors: ['#0077b6', '#00b4d8'], desc: 'Fresh blue tones ideal for academic presentations.' },
-  { id: 'sunset-warm', name: 'Sunset Warm', category: 'Startup', colors: ['#ff6b35', '#ff9f1c'], desc: 'Warm energetic design for pitch decks.' },
-  { id: 'emerald-nature', name: 'Emerald Nature', category: 'Education', colors: ['#2d6a4f', '#52b788'], desc: 'Natural green palette for eco and health topics.' },
-  { id: 'minimal-clean', name: 'Minimal Clean', category: 'Business', colors: ['#e2e8f0', '#0d6efd'], desc: 'Ultra-clean minimal design for any topic.' },
-];
+const CATEGORIES = ['All', 'Business', 'Education', 'Startup', 'Corporate', 'General'];
 
-const CATEGORIES = ['All', 'Business', 'Education', 'Startup'];
+const getCategory = (template) => {
+  const text = `${template.best_for || ''} ${template.name || ''}`.toLowerCase();
+  if (text.includes('education') || text.includes('research') || text.includes('training')) return 'Education';
+  if (text.includes('startup') || text.includes('pitch') || text.includes('campaign')) return 'Startup';
+  if (text.includes('corporate') || text.includes('board') || text.includes('strategy')) return 'Corporate';
+  if (text.includes('business') || text.includes('executive') || text.includes('consulting')) return 'Business';
+  return 'General';
+};
 
 export default function TemplatesPage() {
   const [activeCategory, setActiveCategory] = useState('All');
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const res = await presentationService.getTemplates();
+        const data = (res.templates || []).map(t => ({
+          id: t.id,
+          name: t.name,
+          desc: t.description || 'Professional PPTX template ready for export.',
+          colors: [t.colors?.primary || '#6C63FF', t.colors?.secondary || '#FF6B6B'],
+          preview_image: t.preview_image || '',
+          best_for: t.best_for || 'General presentations',
+          category: getCategory(t),
+        }));
+        setTemplates(data);
+      } catch {
+        setTemplates([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTemplates();
+  }, []);
 
   const filtered = activeCategory === 'All'
-    ? TEMPLATE_DATA
-    : TEMPLATE_DATA.filter(t => t.category === activeCategory);
+    ? templates
+    : templates.filter(t => t.category === activeCategory);
 
   return (
     <div style={{ paddingTop: 100, paddingBottom: 80 }}>
@@ -47,14 +74,36 @@ export default function TemplatesPage() {
 
         {/* Template Grid */}
         <div className="grid-3" style={{ gap: 28 }}>
+          {loading && [1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="template-card" style={{ minHeight: 250 }}>
+              <div className="skeleton" style={{ height: 150 }} />
+              <div style={{ padding: 16 }}>
+                <div className="skeleton" style={{ height: 14, width: '35%', marginBottom: 8 }} />
+                <div className="skeleton" style={{ height: 16, width: '70%', marginBottom: 8 }} />
+                <div className="skeleton" style={{ height: 12, width: '95%' }} />
+              </div>
+            </div>
+          ))}
+
           {filtered.map((template, i) => (
             <div key={template.id} className="template-card"
               style={{ animation: `fadeInUp 0.5s ease-out ${i * 0.1}s backwards` }}>
               <div className="template-preview" style={{
-                background: `linear-gradient(135deg, ${template.colors[0]}, ${template.colors[1]})`,
+                background: template.preview_image
+                  ? `url(${template.preview_image}) center/cover no-repeat`
+                  : `linear-gradient(135deg, ${template.colors[0]}, ${template.colors[1]})`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: 24,
+                padding: 24, position: 'relative',
               }}>
+                <div style={{
+                  position: 'absolute', top: 10, left: 10,
+                  fontSize: '0.62rem', fontWeight: 700, letterSpacing: 0.4,
+                  color: 'white', background: 'rgba(0,0,0,0.45)',
+                  border: '1px solid rgba(255,255,255,0.25)', borderRadius: 999,
+                  padding: '3px 8px', zIndex: 2,
+                }}>
+                  REAL PPTX
+                </div>
                 {/* Mini slide mockup */}
                 <div style={{
                   width: '80%', aspectRatio: '16/9',
@@ -87,6 +136,9 @@ export default function TemplatesPage() {
                 </div>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 6 }}>{template.name}</h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{template.desc}</p>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 8 }}>
+                  Best for: {template.best_for}
+                </p>
               </div>
             </div>
           ))}

@@ -2,7 +2,6 @@ import ChatHistory from '../models/ChatHistory.js';
 import Presentation from '../models/Presentation.js';
 import aiService from '../services/openaiService.js';
 import pipeline from '../services/presentationPipeline.js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import axios from 'axios';
 import multer from 'multer';
 import fs from 'fs';
@@ -42,7 +41,7 @@ export const upload = multer({
 
 export const generateSlides = async (req, res, next) => {
   try {
-    const { message, chatId, template, language } = req.body;
+    const { message, chatId, template, language, slideCount } = req.body;
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
@@ -84,17 +83,17 @@ export const generateSlides = async (req, res, next) => {
       };
     }
 
-    const result = await aiService.generateSlides(userPrompt, [], fileForAI);
+    const result = await aiService.generateSlides(userPrompt, [], fileForAI, { slideCount: Number(slideCount) || undefined });
 
     if (!result.success) {
       return res.status(500).json({ error: 'Failed to generate slides' });
     }
 
-    // Generate images for each slide using Gemini text model
+    // Fetch stock images for each slide from Pixabay
     const slidesWithImages = await Promise.all(
       result.data.slides.map(async (slide) => {
         try {
-          const imageUrl = await generateImageWithGemini(slide.imageQuery);
+          const imageUrl = await fetchPixabayImage(slide.imageQuery);
           return { ...slide, imageUrl };
         } catch {
           return slide;
@@ -195,79 +194,40 @@ export const getChatById = async (req, res, next) => {
   }
 };
 
-// Generate image using Gemini text model with image output capability
-async function generateImageWithGemini(query) {
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) {
-    return fetchUnsplashImage(query);
-  }
+async function fetchPixabayImage(query) {
+  const key = process.env.PIXABAY_API_KEY;
+  const baseUrl = (process.env.PIXABAY_API_URL || 'https://pixabay.com/api/').replace(/\/$/, '');
+  const safeSearch = String(process.env.PIXABAY_SAFESEARCH || 'true').toLowerCase() !== 'false';
+  const perPage = Math.max(3, Math.min(20, Number(process.env.PIXABAY_PER_PAGE || 8)));
 
-  // Try multiple Gemini models that support image generation (in priority order)
-  const imageModels = [
-    'gemini-2.0-flash-exp',
-    'gemini-2.5-flash-preview-04-17',
-  ];
+  const searchText = (query || 'business presentation').trim();
+  const seed = Math.abs(searchText.split('').reduce((a, b) => a + b.charCodeAt(0), 0));
 
-  const genAI = new GoogleGenerativeAI(geminiKey);
-
-  for (const modelName of imageModels) {
-    try {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: {
-          responseModalities: ['TEXT', 'IMAGE'],
-        },
-      });
-
-      const prompt = `Generate a high-quality, professional, photorealistic image for a presentation slide about: "${query}". 
-The image should be:
-- Landscape orientation (16:9 aspect ratio)
-- Clean, modern, corporate/business style
-- Suitable for professional presentations
-- Vivid colors with good contrast
-- NO text, NO watermarks, NO logos in the image
-Just generate the image, no explanation needed.`;
-
-      const result = await model.generateContent(prompt);
-      const response = result.response;
-
-      // Extract image from response parts
-      if (response.candidates && response.candidates[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData && part.inlineData.data) {
-            console.log(`✅ Image generated with ${modelName} for: "${query.substring(0, 40)}..."`);
-            return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-          }
-        }
-      }
-    } catch (error) {
-      console.warn(`⚠️ ${modelName} image generation failed:`, error.message?.substring(0, 80));
-      continue;
-    }
-  }
-
-  console.warn('⚠️ All Gemini image models failed, falling back to Unsplash.');
-  return fetchUnsplashImage(query);
-}
-
-// Unsplash fallback for images
-async function fetchUnsplashImage(query) {
-  const accessKey = process.env.UNSPLASH_ACCESS_KEY;
-  if (!accessKey || accessKey === 'your_unsplash_access_key_here') {
-    // Use picsum.photos as a reliable fallback (no API key needed)
-    const seed = Math.abs(query.split('').reduce((a, b) => a + b.charCodeAt(0), 0));
+  if (!key) {
     return `https://picsum.photos/seed/${seed}/800/450`;
   }
+
   try {
-    const response = await axios.get('https://api.unsplash.com/search/photos', {
-      params: { query, per_page: 1, orientation: 'landscape' },
-      headers: { Authorization: `Client-ID ${accessKey}` },
+    const response = await axios.get(`${baseUrl}/`, {
+      params: {
+        key,
+        q: searchText,
+        image_type: 'photo',
+        orientation: 'horizontal',
+        safesearch: safeSearch,
+        per_page: perPage,
+      },
+      timeout: 10000,
     });
-    if (response.data.results.length > 0) {
-      return response.data.results[0].urls.regular;
+
+    if (Array.isArray(response.data?.hits) && response.data.hits.length > 0) {
+      const hit = response.data.hits[0];
+      return hit.largeImageURL || hit.webformatURL || hit.previewURL;
     }
-  } catch { /* fallback */ }
-  const seed = Math.abs(query.split('').reduce((a, b) => a + b.charCodeAt(0), 0));
+  } catch {
+    // fallback
+  }
+
   return `https://picsum.photos/seed/${seed}/800/450`;
 }
 
@@ -276,13 +236,16 @@ async function fetchUnsplashImage(query) {
 // ============================================================================
 export const enhanceTopic = async (req, res, next) => {
   try {
-    const { message } = req.body;
+    const { message, slideCount } = req.body;
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
     console.log('🚀 Pipeline Step 1: Enhancing topic...');
-    const brief = await pipeline.enhanceTopic(message);
+    const brief = await pipeline.enhanceTopic(message, {
+      slideCount: Number(slideCount) || 10,
+      language: 'auto',
+    });
     console.log('✅ Topic enhanced:', brief.enhanced_topic);
 
     res.json({ success: true, brief });
@@ -353,7 +316,7 @@ export const generatePipelineSlides = async (req, res, next) => {
         userId: req.user._id,
         title: result.title,
         language: result.language,
-        template: template.template_name || 'custom',
+        template: template.export_template_id || template.template_id || 'modern-gradient',
         templateData: template,
         enhancedBrief: brief,
         slides: dbSlides,

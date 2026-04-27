@@ -39,9 +39,14 @@ const slideSchema = new mongoose.Schema({
 
 const templateSchemaObj = new mongoose.Schema({
   template_id: String,
+  export_template_id: String,
   template_name: String,
   description: String,
   best_for: String,
+  visual_style: String,
+  preview_image: String,
+  master_background_image: String,
+  thumbnail_description: String,
   layout_pattern: { type: mongoose.Schema.Types.Mixed, default: {} },
   color_scheme: {
     primary: { type: String, default: '#6C63FF' },

@@ -20,7 +20,28 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 6000;
+function resolvePort(rawPort) {
+  if (!rawPort) return 6000;
+
+  const direct = Number(rawPort);
+  if (Number.isInteger(direct) && direct > 0 && direct <= 65535) {
+    return direct;
+  }
+
+  const firstNumericMatch = String(rawPort).match(/\d+/);
+  if (firstNumericMatch) {
+    const parsed = Number(firstNumericMatch[0]);
+    if (Number.isInteger(parsed) && parsed > 0 && parsed <= 65535) {
+      console.warn(`⚠️ Invalid PORT value "${rawPort}" detected. Falling back to parsed port ${parsed}.`);
+      return parsed;
+    }
+  }
+
+  console.warn(`⚠️ Invalid PORT value "${rawPort}" detected. Falling back to 6000.`);
+  return 6000;
+}
+
+const PORT = resolvePort(process.env.PORT);
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Connect to MongoDB
@@ -52,16 +73,44 @@ const limiter = rateLimit({
 });
 
 // Middleware
-const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',
+const envAllowedOrigins = [
+  process.env.CLIENT_URL,
+  process.env.FRONTEND_URL,
+  ...(process.env.ALLOWED_ORIGINS || '').split(',').map((origin) => origin.trim()),
+].filter(Boolean);
+
+const defaultAllowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:4173',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'https://presentationgenai.netlify.app',
 ];
+
+const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envAllowedOrigins]));
+const allowNetlifyPreview = (process.env.ALLOW_NETLIFY_PREVIEW || 'true').toLowerCase() !== 'false';
 
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    if (allowNetlifyPreview) {
+      try {
+        const hostname = new URL(origin).hostname;
+        if (hostname.endsWith('.netlify.app')) {
+          callback(null, true);
+          return;
+        }
+      } catch {
+        // ignore malformed origin and return not allowed below
+      }
+    }
+
+    if (!origin) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -70,8 +119,9 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+const jsonBodyLimit = process.env.JSON_BODY_LIMIT || '50mb';
+app.use(express.json({ limit: jsonBodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: jsonBodyLimit }));
 app.use('/api/', limiter);
 
 // Favicon handler

@@ -1,4 +1,4 @@
-import api from './api';
+import api, { API_BASE } from './api';
 
 export const presentationService = {
   async getMyPresentations() {
@@ -33,13 +33,13 @@ export const presentationService = {
 
   // Export URLs - token passed as query param because browser window.open can't send headers
   getExportPPTXUrl(id) {
-    const base = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
+    const base = API_BASE.startsWith('http') ? API_BASE : `${window.location.origin}${API_BASE}`;
     const token = localStorage.getItem('slideedge_token');
     return `${base}/presentations/${id}/export/pptx?token=${token}`;
   },
 
   getExportPDFUrl(id) {
-    const base = import.meta.env.VITE_API_URL || `${window.location.origin}/api`;
+    const base = API_BASE.startsWith('http') ? API_BASE : `${window.location.origin}${API_BASE}`;
     const token = localStorage.getItem('slideedge_token');
     return `${base}/presentations/${id}/export/pdf?token=${token}`;
   },
@@ -61,6 +61,32 @@ export const presentationService = {
     const a = document.createElement('a');
     a.href = url;
     a.download = `presentation_${id}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadPublicPPTX(payload) {
+    const res = await api.post('/presentations/export/public/pptx', payload, {
+      responseType: 'blob',
+      timeout: 240000,
+    });
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(payload?.title || 'presentation').replace(/[^a-zA-Z0-9]/g, '_')}.pptx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  async downloadPublicPDF(payload) {
+    const res = await api.post('/presentations/export/public/pdf', payload, {
+      responseType: 'blob',
+      timeout: 240000,
+    });
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(payload?.title || 'presentation').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
   },

@@ -98,10 +98,14 @@ export const exportPPTX = async (req, res, next) => {
       return res.status(404).json({ error: 'Presentation not found' });
     }
     const buffer = await exportService.generatePPTX(presentation);
-    const filename = `${presentation.title.replace(/[^a-zA-Z0-9]/g, '_')}.pptx`;
+    const sanitizedTitle = (presentation.title || 'presentation').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
+    const filename = `${sanitizedTitle || 'presentation'}.pptx`;
+    
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(Buffer.from(buffer));
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    
+    return res.send(buffer);
   } catch (error) {
     next(error);
   }
@@ -117,10 +121,14 @@ export const exportPDF = async (req, res, next) => {
       return res.status(404).json({ error: 'Presentation not found' });
     }
     const buffer = await exportService.generatePDF(presentation);
-    const filename = `${presentation.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+    const sanitizedTitle = (presentation.title || 'presentation').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
+    const filename = `${sanitizedTitle || 'presentation'}.pdf`;
+    
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.send(Buffer.from(buffer));
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    
+    return res.send(buffer);
   } catch (error) {
     next(error);
   }
@@ -131,6 +139,114 @@ export const getTemplates = async (req, res, next) => {
     const templates = exportService.getTemplates();
     res.json({ templates });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const exportPublicPPTX = async (req, res, next) => {
+  try {
+    const {
+      title,
+      slides,
+      language,
+      template,
+      description,
+      templateData,
+      pipelineVersion,
+    } = req.body || {};
+
+    if (!title || !Array.isArray(slides) || slides.length === 0) {
+      return res.status(400).json({ error: 'title and slides are required' });
+    }
+
+    // Normalize slides to ensure all required properties exist
+    const normalizedSlides = slides.map((slide) => ({
+      heading: slide.heading || 'Untitled Slide',
+      content: slide.content || '',
+      bullets: Array.isArray(slide.bullets) ? slide.bullets.filter(b => b) : [],
+      imageUrl: slide.imageUrl || '',
+      imageQuery: slide.imageQuery || '',
+      notes: slide.notes || '',
+      layout: slide.layout || 'content',
+      order: slide.order || 0,
+      slide_type: slide.slide_type || (slide.layout === 'title' ? 'title' : 'content'),
+    }));
+
+    const deck = {
+      title,
+      slides: normalizedSlides,
+      language: language || 'en',
+      template: template || 'modern-gradient',
+      description: description || '',
+      templateData: templateData || null,
+      pipelineVersion: Number(pipelineVersion) || 2,
+    };
+
+    const buffer = await exportService.generatePPTX(deck);
+    const sanitizedTitle = (title || 'presentation').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
+    const filename = `${sanitizedTitle || 'presentation'}.pptx`;
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    
+    return res.send(buffer);
+  } catch (error) {
+    console.error('❌ PPTX Export Error:', error.message, error.stack);
+    next(error);
+  }
+};
+
+export const exportPublicPDF = async (req, res, next) => {
+  try {
+    const {
+      title,
+      slides,
+      language,
+      template,
+      description,
+      templateData,
+      pipelineVersion,
+    } = req.body || {};
+
+    if (!title || !Array.isArray(slides) || slides.length === 0) {
+      return res.status(400).json({ error: 'title and slides are required' });
+    }
+
+    // Normalize slides to ensure all required properties exist
+    const normalizedSlides = slides.map((slide) => ({
+      heading: slide.heading || 'Untitled Slide',
+      content: slide.content || '',
+      bullets: Array.isArray(slide.bullets) ? slide.bullets.filter(b => b) : [],
+      imageUrl: slide.imageUrl || '',
+      imageQuery: slide.imageQuery || '',
+      notes: slide.notes || '',
+      layout: slide.layout || 'content',
+      order: slide.order || 0,
+      slide_type: slide.slide_type || (slide.layout === 'title' ? 'title' : 'content'),
+    }));
+
+    const deck = {
+      title,
+      slides: normalizedSlides,
+      language: language || 'en',
+      template: template || 'modern-gradient',
+      description: description || '',
+      templateData: templateData || null,
+      pipelineVersion: Number(pipelineVersion) || 2,
+    };
+
+    const buffer = await exportService.generatePDF(deck);
+    const sanitizedTitle = (title || 'presentation').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
+    const filename = `${sanitizedTitle || 'presentation'}.pdf`;
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    
+    return res.send(buffer);
+  } catch (error) {
+    console.error('❌ PDF Export Error:', error.message, error.stack);
     next(error);
   }
 };

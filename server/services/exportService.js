@@ -2,6 +2,7 @@ import PptxGenJS from 'pptxgenjs';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import axios from 'axios';
 import fs from 'fs';
+import { getTemplateCatalog } from './templateCatalog.js';
 
 // ============================================================================
 // PROFESSIONAL TEMPLATES — Rich presentation designs
@@ -95,16 +96,25 @@ const TEMPLATES = {
 
 class ExportService {
   getTemplates() {
-    return Object.entries(TEMPLATES).map(([key, val]) => ({
-      id: key,
-      name: val.name,
-      colors: {
-        primary: `#${val.accentColor}`,
-        secondary: `#${val.accent2}`,
-        bg: `#${val.contentBg}`,
-        heading: `#${val.headingColor}`,
-      },
-    }));
+    const catalogMap = new Map(getTemplateCatalog().map(t => [t.export_template_id || t.template_id, t]));
+
+    return Object.entries(TEMPLATES).map(([key, val]) => {
+      const catalogTemplate = catalogMap.get(key);
+      return {
+        id: key,
+        name: val.name,
+        description: catalogTemplate?.description || '',
+        best_for: catalogTemplate?.best_for || '',
+        preview_image: catalogTemplate?.preview_image || '',
+        thumbnail_description: catalogTemplate?.thumbnail_description || '',
+        colors: {
+          primary: `#${val.accentColor}`,
+          secondary: `#${val.accent2}`,
+          bg: `#${val.contentBg}`,
+          heading: `#${val.headingColor}`,
+        },
+      };
+    });
   }
 
   // Build template config from pipeline v2 templateData
@@ -131,73 +141,119 @@ class ExportService {
   // PPTX GENERATION — Professional PowerPoint
   // ============================================================================
   async generatePPTX(presentation) {
-    const pptx = new PptxGenJS();
+    try {
+      const pptx = new PptxGenJS();
 
-    // Use dynamic template from pipeline v2, or fall back to hardcoded templates
-    let t;
-    if (presentation.pipelineVersion === 2 && presentation.templateData) {
-      t = this._buildDynamicTemplate(presentation.templateData);
-    } else {
-      t = TEMPLATES[presentation.template] || TEMPLATES['modern-gradient'];
-    }
-
-    const isUrdu = presentation.language === 'ur';
-    const font = isUrdu ? 'Arial' : t.fontHeading;
-    const bodyFont = isUrdu ? 'Arial' : t.fontBody;
-
-    pptx.author = 'SlideEdge AI';
-    pptx.title = presentation.title;
-    pptx.subject = presentation.description || 'AI Generated Presentation';
-    pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 inches (16:9)
-
-    let masterBackgroundDataUri = null;
-    if (t.master_background_image) {
-      try {
-        const resp = await axios.get(t.master_background_image, { responseType: 'arraybuffer', timeout: 8000 });
-        const b64 = Buffer.from(resp.data).toString('base64');
-        const mime = resp.headers['content-type'] || 'image/jpeg';
-        masterBackgroundDataUri = `data:${mime};base64,${b64}`;
-        console.log('✅ Fetched Freepik premium background for PPTX export');
-      } catch (err) {
-        console.warn('⚠️ Failed to fetch master background image:', err.message);
+      // Validate presentation data
+      if (!presentation.slides || !Array.isArray(presentation.slides)) {
+        throw new Error('Invalid presentation: slides must be an array');
       }
-    }
+      if (presentation.slides.length === 0) {
+        throw new Error('Invalid presentation: at least one slide is required');
+      }
 
-    for (let i = 0; i < presentation.slides.length; i++) {
-      const slideData = presentation.slides[i];
-      const slide = pptx.addSlide();
+      // Prefer real preset PPTX templates; only use dynamic template when preset id is unknown.
+      let t;
+      if (presentation.template && TEMPLATES[presentation.template]) {
+        t = TEMPLATES[presentation.template];
+      } else if (presentation.pipelineVersion === 2 && presentation.templateData) {
+        t = this._buildDynamicTemplate(presentation.templateData);
+      } else {
+        t = TEMPLATES[presentation.template] || TEMPLATES['modern-gradient'];
+      }
 
-      // Fetch image bytes if available (for embedding)
-      let imageDataUri = null;
-      if (slideData.imageUrl && slideData.imageUrl.startsWith('data:')) {
-        imageDataUri = slideData.imageUrl;
-      } else if (slideData.imageUrl && slideData.imageUrl.startsWith('http')) {
+      // Validate template object
+      if (!t || typeof t !== 'object') {
+        console.warn('⚠️ Invalid template object, falling back to default');
+        t = TEMPLATES['modern-gradient'];
+      }
+
+      // Ensure template has required properties with defaults
+      t = {
+        titleBgGrad: { color1: '6C63FF', color2: 'FF6B6B', angle: 135 },
+        contentBg: 'FFFFFF',
+        headingColor: '1E1E2E',
+        textColor: '555555',
+        accentColor: '6C63FF',
+        accent2: 'FF6B6B',
+        footerBg: 'F0F0FF',
+        bulletIcon: '●',
+        fontHeading: 'Calibri',
+        fontBody: 'Calibri',
+        ...t, // Override defaults with actual template values
+      };
+
+      const isUrdu = presentation.language === 'ur';
+      const font = isUrdu ? 'Arial' : (t.fontHeading || 'Calibri');
+      const bodyFont = isUrdu ? 'Arial' : (t.fontBody || 'Calibri');
+
+      pptx.author = 'SlideEdge AI';
+      pptx.title = presentation.title || 'Presentation';
+      pptx.subject = presentation.description || 'AI Generated Presentation';
+      pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 inches (16:9)
+
+      let masterBackgroundDataUri = null;
+      if (t.master_background_image) {
         try {
-          const resp = await axios.get(slideData.imageUrl, { responseType: 'arraybuffer', timeout: 8000 });
+          const resp = await axios.get(t.master_background_image, { responseType: 'arraybuffer', timeout: 8000 });
           const b64 = Buffer.from(resp.data).toString('base64');
           const mime = resp.headers['content-type'] || 'image/jpeg';
-          imageDataUri = `data:${mime};base64,${b64}`;
-        } catch { /* skip image if download fails */ }
+          masterBackgroundDataUri = `data:${mime};base64,${b64}`;
+          console.log('✅ Fetched Freepik premium background for PPTX export');
+        } catch (err) {
+          console.warn('⚠️ Failed to fetch master background image:', err.message);
+        }
       }
 
-      // Route to the right builder based on layout/slide_type
-      const sType = slideData.slide_type || slideData.layout;
-      if (sType === 'title' || slideData.layout === 'title' || slideData.layout === 'full-bleed-image') {
-        this._buildTitleSlide(slide, slideData, t, font, bodyFont, isUrdu, imageDataUri, pptx, masterBackgroundDataUri);
-      } else if (sType === 'section-divider' || slideData.layout === 'section-divider') {
-        this._buildSectionDivider(slide, slideData, t, font, bodyFont, isUrdu, pptx, masterBackgroundDataUri);
-      } else if (sType === 'data' || slideData.layout === 'chart-left-text-right' || slideData.layout === 'split-stats') {
-        this._buildDataSlide(slide, slideData, t, font, bodyFont, isUrdu, imageDataUri, pptx, i + 1, presentation.slides.length, masterBackgroundDataUri);
-      } else {
-        this._buildContentSlide(slide, slideData, t, font, bodyFont, isUrdu, imageDataUri, pptx, i + 1, presentation.slides.length, masterBackgroundDataUri);
+      for (let i = 0; i < presentation.slides.length; i++) {
+        const slideData = presentation.slides[i];
+        if (!slideData || typeof slideData !== 'object') {
+          console.warn(`⚠️ Skipping invalid slide ${i}: not an object`);
+          continue;
+        }
+
+        const slide = pptx.addSlide();
+
+        // Fetch image bytes if available (for embedding)
+        let imageDataUri = null;
+        if (slideData.imageUrl && slideData.imageUrl.startsWith('data:')) {
+          imageDataUri = slideData.imageUrl;
+        } else if (slideData.imageUrl && slideData.imageUrl.startsWith('http')) {
+          try {
+            const resp = await axios.get(slideData.imageUrl, { responseType: 'arraybuffer', timeout: 8000 });
+            const b64 = Buffer.from(resp.data).toString('base64');
+            const mime = resp.headers['content-type'] || 'image/jpeg';
+            imageDataUri = `data:${mime};base64,${b64}`;
+          } catch { /* skip image if download fails */ }
+        }
+
+        // Route to the right builder based on layout/slide_type
+        const sType = slideData.slide_type || slideData.layout;
+        try {
+          if (sType === 'title' || slideData.layout === 'title' || slideData.layout === 'full-bleed-image') {
+            this._buildTitleSlide(slide, slideData, t, font, bodyFont, isUrdu, imageDataUri, pptx, masterBackgroundDataUri);
+          } else if (sType === 'section-divider' || slideData.layout === 'section-divider') {
+            this._buildSectionDivider(slide, slideData, t, font, bodyFont, isUrdu, pptx, masterBackgroundDataUri);
+          } else if (sType === 'data' || slideData.layout === 'chart-left-text-right' || slideData.layout === 'split-stats') {
+            this._buildDataSlide(slide, slideData, t, font, bodyFont, isUrdu, imageDataUri, pptx, i + 1, presentation.slides.length, masterBackgroundDataUri);
+          } else {
+            this._buildContentSlide(slide, slideData, t, font, bodyFont, isUrdu, imageDataUri, pptx, i + 1, presentation.slides.length, masterBackgroundDataUri);
+          }
+        } catch (slideErr) {
+          console.error(`❌ Error building slide ${i}:`, slideErr.message);
+          throw slideErr; // Re-throw to fail the entire export
+        }
+
+        if (slideData.notes) {
+          slide.addNotes(slideData.notes);
+        }
       }
 
-      if (slideData.notes) {
-        slide.addNotes(slideData.notes);
-      }
+      return await pptx.write({ outputType: 'nodebuffer' });
+    } catch (err) {
+      console.error('❌ PPTX Generation Error:', err.message);
+      throw err; // Re-throw for controller to handle
     }
-
-    return await pptx.write({ outputType: 'nodebuffer' });
   }
 
   // --- Title Slide ---
@@ -205,13 +261,15 @@ class ExportService {
     if (masterBgDataUri) {
       slide.background = { data: masterBgDataUri };
     } else {
-      slide.background = { fill: { type: 'solid', color: t.titleBgGrad.color1 } };
+      const bgColor = t?.titleBgGrad?.color1 || '6C63FF';
+      slide.background = { fill: { type: 'solid', color: bgColor } };
     }
 
     // Gradient overlay shape (full slide)
+    const overlayColor = t?.titleBgGrad?.color2 || 'FF6B6B';
     slide.addShape(pptx.ShapeType.rect, {
       x: 0, y: 0, w: '100%', h: '100%',
-      fill: { type: 'solid', color: t.titleBgGrad.color2, transparency: 60 },
+      fill: { type: 'solid', color: overlayColor, transparency: 60 },
     });
 
     // Background image if available
@@ -225,16 +283,18 @@ class ExportService {
         });
       } catch { /* skip broken images */ }
       // Dark overlay for readability
+      const darkOverlay = t?.titleBgGrad?.color1 || '6C63FF';
       slide.addShape(pptx.ShapeType.rect, {
         x: 0, y: 0, w: '100%', h: '100%',
-        fill: { type: 'solid', color: t.titleBgGrad.color1, transparency: 40 },
+        fill: { type: 'solid', color: darkOverlay, transparency: 40 },
       });
     }
 
     // Decorative accent circle (top-right)
+    const accentColor2 = t?.accent2 || 'FF6B6B';
     slide.addShape(pptx.ShapeType.ellipse, {
       x: 10.5, y: -1.5, w: 4, h: 4,
-      fill: { type: 'solid', color: t.accent2, transparency: 80 },
+      fill: { type: 'solid', color: accentColor2, transparency: 80 },
     });
     // Decorative accent circle (bottom-left)
     slide.addShape(pptx.ShapeType.ellipse, {
@@ -264,9 +324,10 @@ class ExportService {
     }
 
     // Bottom accent line
+    const lineColor = t?.accent2 || 'FF6B6B';
     slide.addShape(pptx.ShapeType.rect, {
       x: 1.2, y: 4.2, w: 2.5, h: 0.06,
-      fill: { type: 'solid', color: t.accent2 },
+      fill: { type: 'solid', color: lineColor },
     });
 
     // "Powered by" label
@@ -283,25 +344,27 @@ class ExportService {
     if (masterBgDataUri) {
       slide.background = { data: masterBgDataUri };
     } else {
-      slide.background = { color: t.contentBg };
+      const bgColor = t?.contentBg || 'FFFFFF';
+      slide.background = { color: bgColor };
     }
 
     // Top accent bar
+    const accentColor = t?.accentColor || '6C63FF';
     slide.addShape(pptx.ShapeType.rect, {
       x: 0, y: 0, w: '100%', h: 0.06,
-      fill: { type: 'solid', color: t.accentColor },
+      fill: { type: 'solid', color: accentColor },
     });
 
     // Left accent strip
     slide.addShape(pptx.ShapeType.rect, {
       x: 0, y: 0, w: 0.08, h: '100%',
-      fill: { type: 'solid', color: t.accentColor },
+      fill: { type: 'solid', color: accentColor },
     });
 
     // Decorative corner shape (top-right)
     slide.addShape(pptx.ShapeType.rect, {
       x: 12.2, y: 0, w: 1.2, h: 0.8,
-      fill: { type: 'solid', color: t.accentColor, transparency: 90 },
+      fill: { type: 'solid', color: accentColor, transparency: 90 },
       rectRadius: 0,
     });
 
@@ -310,27 +373,30 @@ class ExportService {
     const textAreaX = 0.8;
 
     // Heading with accent underline
+    const headingColor = t?.headingColor || '1E1E2E';
     slide.addText(data.heading, {
       x: textAreaX, y: 0.4, w: textAreaWidth, h: 0.9,
       fontSize: 30, fontFace: font,
-      color: t.headingColor, bold: true,
+      color: headingColor, bold: true,
       rtlMode: isUrdu,
       align: isUrdu ? 'right' : 'left',
     });
 
     // Heading underline
+    const underlineColor = t?.accentColor || '6C63FF';
     slide.addShape(pptx.ShapeType.rect, {
       x: textAreaX, y: 1.25, w: 1.8, h: 0.05,
-      fill: { type: 'solid', color: t.accentColor },
+      fill: { type: 'solid', color: underlineColor },
     });
 
     // Content paragraph
     let bulletStartY = 1.6;
     if (data.content) {
+      const textColor = t?.textColor || '555555';
       slide.addText(data.content, {
         x: textAreaX, y: 1.5, w: textAreaWidth, h: 1.0,
         fontSize: 14, fontFace: bodyFont,
-        color: t.textColor,
+        color: textColor,
         rtlMode: isUrdu,
         align: isUrdu ? 'right' : 'left',
         lineSpacingMultiple: 1.4,
@@ -340,19 +406,22 @@ class ExportService {
 
     // Bullet points — styled with icons
     if (data.bullets && data.bullets.length > 0) {
+      const bulletIcon = t?.bulletIcon || '●';
+      const bulletAccentColor = t?.accentColor || '6C63FF';
+      const bulletTextColor = t?.textColor || '555555';
       const bulletRows = data.bullets.map((b, idx) => ([
         {
-          text: `${t.bulletIcon} `,
+          text: `${bulletIcon} `,
           options: {
             fontSize: 15, fontFace: bodyFont,
-            color: t.accentColor, bold: true,
+            color: bulletAccentColor, bold: true,
           },
         },
         {
           text: b,
           options: {
             fontSize: 15, fontFace: bodyFont,
-            color: t.textColor, breakLine: true,
+            color: bulletTextColor, breakLine: true,
           },
         },
       ]));
@@ -377,9 +446,10 @@ class ExportService {
           shadow: { type: 'outer', blur: 8, offset: 3, color: '000000', opacity: 0.15 },
         });
         // Accent border for image
+        const imgBorderColor = t?.accentColor || '6C63FF';
         slide.addShape(pptx.ShapeType.rect, {
           x: 8.35, y: 0.55, w: 4.6, h: 3.5,
-          line: { color: t.accentColor, width: 1.5 },
+          line: { color: imgBorderColor, width: 1.5 },
           fill: { type: 'none' },
           rectRadius: 0.15,
         });
@@ -387,16 +457,18 @@ class ExportService {
     }
 
     // Footer bar
+    const footerBg = t?.footerBg || 'F0F0FF';
     slide.addShape(pptx.ShapeType.rect, {
       x: 0, y: 7.0, w: '100%', h: 0.5,
-      fill: { type: 'solid', color: t.footerBg },
+      fill: { type: 'solid', color: footerBg },
     });
 
     // Slide number
+    const footerAccentColor = t?.accentColor || '6C63FF';
     slide.addText(`${slideNum} / ${totalSlides}`, {
       x: 11.8, y: 7.05, w: 1.3, h: 0.4,
       fontSize: 10, fontFace: bodyFont,
-      color: t.accentColor, align: 'right',
+      color: footerAccentColor, align: 'right',
       bold: true,
     });
 
@@ -414,13 +486,15 @@ class ExportService {
     if (masterBgDataUri) {
       slide.background = { data: masterBgDataUri };
     } else {
-      slide.background = { fill: { type: 'solid', color: t.accentColor } };
+      const bgColor = t?.accentColor || '6C63FF';
+      slide.background = { fill: { type: 'solid', color: bgColor } };
     }
 
     // Gradient overlay
+    const overlayColor = t?.accent2 || 'FF6B6B';
     slide.addShape(pptx.ShapeType.rect, {
       x: 0, y: 0, w: '100%', h: '100%',
-      fill: { type: 'solid', color: t.accent2, transparency: 70 },
+      fill: { type: 'solid', color: overlayColor, transparency: 70 },
     });
 
     // Decorative shapes
@@ -466,20 +540,24 @@ class ExportService {
     if (masterBgDataUri) {
       slide.background = { data: masterBgDataUri };
     } else {
-      slide.background = { color: t.contentBg };
+      const bgColor = t?.contentBg || 'FFFFFF';
+      slide.background = { color: bgColor };
     }
 
     // Top accent bar
+    const accentColor = t?.accentColor || '6C63FF';
+    const headingColor = t?.headingColor || '1E1E2E';
+    
     slide.addShape(pptx.ShapeType.rect, {
       x: 0, y: 0, w: '100%', h: 0.06,
-      fill: { type: 'solid', color: t.accentColor },
+      fill: { type: 'solid', color: accentColor },
     });
 
     // Heading
     slide.addText(data.heading, {
       x: 0.8, y: 0.4, w: 11.5, h: 0.9,
       fontSize: 28, fontFace: font,
-      color: t.headingColor, bold: true,
+      color: headingColor, bold: true,
       rtlMode: isUrdu,
       align: isUrdu ? 'right' : 'left',
     });
@@ -487,7 +565,7 @@ class ExportService {
     // Heading underline
     slide.addShape(pptx.ShapeType.rect, {
       x: 0.8, y: 1.25, w: 1.8, h: 0.05,
-      fill: { type: 'solid', color: t.accentColor },
+      fill: { type: 'solid', color: accentColor },
     });
 
     // Data visual area (left side) or stat callouts
@@ -501,7 +579,7 @@ class ExportService {
         // Stat box background
         slide.addShape(pptx.ShapeType.rect, {
           x: xPos, y: 1.8, w: boxWidth, h: 2.2,
-          fill: { type: 'solid', color: t.accentColor, transparency: 92 },
+          fill: { type: 'solid', color: accentColor, transparency: 92 },
           rectRadius: 0.15,
         });
         // Stat value

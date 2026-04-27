@@ -33,8 +33,8 @@ export default function TemplateSuggestionCard({ template, isSelected, onSelect 
       {/* Header with Freepik Image or Fallback Gradient */}
       <div style={{
         height: 120, position: 'relative', overflow: 'hidden',
-        background: template.master_background_image 
-          ? `url(${template.master_background_image}) center/cover no-repeat`
+        background: (template.preview_image || template.master_background_image)
+          ? `url(${template.preview_image || template.master_background_image}) center/cover no-repeat`
           : `linear-gradient(135deg, ${cs.primary || '#6C63FF'}, ${cs.secondary || '#FF6B6B'})`,
       }}>
         {/* Dark overlay for readability */}
@@ -44,7 +44,7 @@ export default function TemplateSuggestionCard({ template, isSelected, onSelect 
         }} />
 
         {/* Decorative shapes only if fallback gradient */}
-        {!template.master_background_image && (
+        {!(template.preview_image || template.master_background_image) && (
           <>
             <div style={{
               position: 'absolute', right: -20, top: -20,
@@ -90,6 +90,16 @@ export default function TemplateSuggestionCard({ template, isSelected, onSelect 
             <FiCheck size={14} style={{ color: cs.primary || 'var(--primary)' }} />
           </div>
         )}
+
+        <span style={{
+          position: 'absolute', left: 8, top: 8,
+          fontSize: '0.62rem', fontWeight: 700, letterSpacing: 0.4,
+          color: 'white', background: 'rgba(0,0,0,0.45)',
+          border: '1px solid rgba(255,255,255,0.25)',
+          borderRadius: 999, padding: '3px 8px',
+        }}>
+          REAL PPTX
+        </span>
       </div>
 
       {/* Body */}

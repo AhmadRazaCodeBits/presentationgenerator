@@ -19,6 +19,8 @@ const LANGUAGES = [
   { id: 'ur', label: 'اردو (Urdu)', icon: '🇵🇰', flag: 'UR' },
 ];
 
+const SLIDE_COUNTS = [6, 8, 10, 12, 15, 18];
+
 const SUGGESTIONS = [
   'Create a presentation about Artificial Intelligence',
   'Generate slides for Digital Marketing Strategy',
@@ -56,6 +58,7 @@ export default function ChatbotPage() {
 
   // UI state
   const [selectedLanguage, setSelectedLanguage] = useState('auto');
+  const [selectedSlideCount, setSelectedSlideCount] = useState(10);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
@@ -136,10 +139,11 @@ export default function ChatbotPage() {
     const lang = LANGUAGES.find(l => l.id === selectedLanguage);
     const langLabel = selectedLanguage !== 'auto' ? ` [${lang?.flag}]` : '';
     const fileLabel = attachedFile ? ` 📎 ${attachedFile.name}` : '';
+    const slideLabel = ` (${selectedSlideCount} slides)`;
 
     setMessages(prev => [...prev, {
       role: 'user',
-      content: `${topic}${langLabel}${fileLabel}`,
+      content: `${topic}${langLabel}${slideLabel}${fileLabel}`,
     }]);
 
     // Step 1: Enhance Topic
@@ -151,7 +155,10 @@ export default function ChatbotPage() {
     }]);
 
     try {
-      const enhanceResult = await chatService.enhanceTopic(topic);
+      const enhanceResult = await chatService.enhanceTopic(topic, {
+        slideCount: selectedSlideCount,
+        language: selectedLanguage,
+      });
 
       if (enhanceResult.success && enhanceResult.brief) {
         setEnhancedBrief(enhanceResult.brief);
@@ -271,7 +278,7 @@ export default function ChatbotPage() {
           const updated = prev.filter(m => m.type !== 'generating');
           return [...updated, {
             role: 'assistant',
-            content: `🎉 Your presentation is ready! **"${result.data.title}"** — ${slideData.length} slides with AI-generated images.\n\n${slideList}\n\n📝 Click any slide to edit. Use the toolbar to export or present.`,
+            content: `🎉 Your presentation is ready! **"${result.data.title}"** — ${slideData.length} slides with Pixabay stock images.\n\n${slideList}\n\n📝 Click any slide to edit. Use the toolbar to export or present.`,
             slides: slideData,
           }];
         });
@@ -350,16 +357,44 @@ export default function ChatbotPage() {
   const handleExportPPTX = () => {
     if (currentPresentationId) {
       window.open(presentationService.getExportPPTXUrl(currentPresentationId), '_blank');
+    } else if (slides.length > 0) {
+      presentationService.downloadPublicPPTX({
+        title: enhancedBrief?.enhanced_topic || slides[0]?.heading || 'Presentation',
+        slides,
+        language: selectedLanguage === 'ur' ? 'ur' : 'en',
+        template: selectedTemplate?.export_template_id || selectedTemplate?.template_id || 'modern-gradient',
+        templateData: selectedTemplate || null,
+        pipelineVersion: 2,
+      }).catch((error) => {
+        const message = error?.response?.data?.error || (error?.response?.status === 413
+          ? 'Presentation is too large to export in one request. Try fewer slides.'
+          : 'Failed to download PPTX');
+        toast.error(message);
+      });
     } else {
-      toast.error('Save first to export. Login required.');
+      toast.error('Generate slides first to export.');
     }
   };
 
   const handleExportPDF = () => {
     if (currentPresentationId) {
       window.open(presentationService.getExportPDFUrl(currentPresentationId), '_blank');
+    } else if (slides.length > 0) {
+      presentationService.downloadPublicPDF({
+        title: enhancedBrief?.enhanced_topic || slides[0]?.heading || 'Presentation',
+        slides,
+        language: selectedLanguage === 'ur' ? 'ur' : 'en',
+        template: selectedTemplate?.export_template_id || selectedTemplate?.template_id || 'modern-gradient',
+        templateData: selectedTemplate || null,
+        pipelineVersion: 2,
+      }).catch((error) => {
+        const message = error?.response?.data?.error || (error?.response?.status === 413
+          ? 'Presentation is too large to export in one request. Try fewer slides.'
+          : 'Failed to download PDF');
+        toast.error(message);
+      });
     } else {
-      toast.error('Save first to export. Login required.');
+      toast.error('Generate slides first to export.');
     }
   };
 
@@ -804,6 +839,28 @@ export default function ChatbotPage() {
                   )}
                 </div>
 
+                {/* Slide Count Selector */}
+                <select
+                  value={selectedSlideCount}
+                  onChange={(e) => setSelectedSlideCount(Number(e.target.value))}
+                  style={{
+                    height: 36,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-light)',
+                    background: 'var(--surface)',
+                    color: 'var(--text-primary)',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    padding: '0 8px',
+                    outline: 'none',
+                  }}
+                  title="Number of slides"
+                >
+                  {SLIDE_COUNTS.map((count) => (
+                    <option key={count} value={count}>{count} slides</option>
+                  ))}
+                </select>
+
                 {/* Text Input */}
                 <input ref={inputRef} type="text" value={input} onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyPress}
@@ -833,7 +890,7 @@ export default function ChatbotPage() {
             </div>
 
             <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 8 }}>
-              3-Step Pipeline: Analyze → Design → Generate • Supports English & Urdu • AI Powered by Gemini
+              3-Step Pipeline: Analyze → Real PPTX Template → Generate • Text via RapidAPI • Images via Pixabay
             </p>
           </div>
         </div>

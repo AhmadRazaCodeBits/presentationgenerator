@@ -1,0 +1,178 @@
+const TEMPLATE_CATALOG = [
+  {
+    template_id: 'modern-gradient',
+    export_template_id: 'modern-gradient',
+    template_name: 'Modern Gradient Pro',
+    description: 'Bold gradient title slides with clean, high-contrast content pages for business storytelling.',
+    best_for: 'Startup pitches, product launches, executive overviews',
+    visual_style: 'Gradient-led, modern, energetic',
+    layout_pattern: {
+      title_slide: 'full-bleed gradient with centered headline',
+      content_slides: 'alternating image-right and text-led blocks',
+      data_slides: 'chart-left-text-right',
+      section_divider: 'accent color block',
+    },
+    color_scheme: {
+      primary: '#6C63FF',
+      secondary: '#FF6B6B',
+      accent: '#00D2FF',
+      background: '#FFFFFF',
+      text: '#333333',
+    },
+    font_style: {
+      heading: 'Calibri',
+      body: 'Calibri',
+    },
+    thumbnail_description: 'Purple-coral gradient hero with clean white content slide cards.',
+    preview_image: 'https://images.pexels.com/photos/3182751/pexels-photo-3182751.jpeg?auto=compress&cs=tinysrgb&w=900',
+    master_background_image: 'https://images.pexels.com/photos/7130555/pexels-photo-7130555.jpeg?auto=compress&cs=tinysrgb&w=1400',
+  },
+  {
+    template_id: 'dark-professional',
+    export_template_id: 'dark-professional',
+    template_name: 'Dark Professional Boardroom',
+    description: 'High-end dark theme optimized for C-level updates and strategy discussions.',
+    best_for: 'Corporate strategy, quarterly reports, consulting decks',
+    visual_style: 'Premium dark, minimal, boardroom-ready',
+    layout_pattern: {
+      title_slide: 'dark gradient cover with spotlight headline',
+      content_slides: 'text-heavy with controlled accent highlights',
+      data_slides: 'full-width charts with focused callouts',
+      section_divider: 'minimal line divider',
+    },
+    color_scheme: {
+      primary: '#1A1A2E',
+      secondary: '#16213E',
+      accent: '#E94560',
+      background: '#0F0F23',
+      text: '#E6E8F2',
+    },
+    font_style: {
+      heading: 'Calibri',
+      body: 'Calibri',
+    },
+    thumbnail_description: 'Deep navy base with vivid red accent and sleek typography.',
+    preview_image: 'https://images.pexels.com/photos/5716032/pexels-photo-5716032.jpeg?auto=compress&cs=tinysrgb&w=900',
+    master_background_image: 'https://images.pexels.com/photos/8728559/pexels-photo-8728559.jpeg?auto=compress&cs=tinysrgb&w=1400',
+  },
+  {
+    template_id: 'ocean-breeze',
+    export_template_id: 'ocean-breeze',
+    template_name: 'Ocean Breeze Academic',
+    description: 'Fresh blue visual language with strong readability for educational and research content.',
+    best_for: 'Education, training, research findings, workshops',
+    visual_style: 'Bright, clean, learning-focused',
+    layout_pattern: {
+      title_slide: 'cool blue gradient cover with wide margins',
+      content_slides: 'image-left-text-right alternation',
+      data_slides: 'split-stats and comparison panels',
+      section_divider: 'soft wave divider',
+    },
+    color_scheme: {
+      primary: '#0077B6',
+      secondary: '#00B4D8',
+      accent: '#90E0EF',
+      background: '#F0F9FF',
+      text: '#1F3349',
+    },
+    font_style: {
+      heading: 'Calibri',
+      body: 'Calibri',
+    },
+    thumbnail_description: 'Ocean blues, airy spacing, and calm content blocks.',
+    preview_image: 'https://images.pexels.com/photos/1181396/pexels-photo-1181396.jpeg?auto=compress&cs=tinysrgb&w=900',
+    master_background_image: 'https://images.pexels.com/photos/1001682/pexels-photo-1001682.jpeg?auto=compress&cs=tinysrgb&w=1400',
+  },
+  {
+    template_id: 'sunset-warm',
+    export_template_id: 'sunset-warm',
+    template_name: 'Sunset Warm Pitch',
+    description: 'Warm and persuasive style that keeps investor and sales stories visually engaging.',
+    best_for: 'Sales decks, startup storytelling, campaign proposals',
+    visual_style: 'Warm, persuasive, high-energy',
+    layout_pattern: {
+      title_slide: 'warm gradient hero with strong CTA headline',
+      content_slides: 'top-image-bottom-text storytelling sequence',
+      data_slides: 'stat-callout with highlighted metrics',
+      section_divider: 'color block transition',
+    },
+    color_scheme: {
+      primary: '#FF6B35',
+      secondary: '#FF9F1C',
+      accent: '#FFD166',
+      background: '#FFFAF5',
+      text: '#5C3A21',
+    },
+    font_style: {
+      heading: 'Calibri',
+      body: 'Calibri',
+    },
+    thumbnail_description: 'Orange sunset palette with high-energy highlight treatment.',
+    preview_image: 'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=900',
+    master_background_image: 'https://images.pexels.com/photos/1029604/pexels-photo-1029604.jpeg?auto=compress&cs=tinysrgb&w=1400',
+  },
+  {
+    template_id: 'emerald-nature',
+    export_template_id: 'emerald-nature',
+    template_name: 'Emerald Nature Impact',
+    description: 'Nature-inspired professional template built for sustainability and health narratives.',
+    best_for: 'Sustainability, health, NGO reporting, climate topics',
+    visual_style: 'Natural, trustworthy, calm',
+    layout_pattern: {
+      title_slide: 'green overlay cover with clean typography',
+      content_slides: 'two-column explanatory layout',
+      data_slides: 'insight-first chart sections',
+      section_divider: 'organic shape divider',
+    },
+    color_scheme: {
+      primary: '#2D6A4F',
+      secondary: '#52B788',
+      accent: '#95D5B2',
+      background: '#F0FAF4',
+      text: '#1B4332',
+    },
+    font_style: {
+      heading: 'Calibri',
+      body: 'Calibri',
+    },
+    thumbnail_description: 'Deep green accents with soft natural background tones.',
+    preview_image: 'https://images.pexels.com/photos/6238087/pexels-photo-6238087.jpeg?auto=compress&cs=tinysrgb&w=900',
+    master_background_image: 'https://images.pexels.com/photos/321576/pexels-photo-321576.jpeg?auto=compress&cs=tinysrgb&w=1400',
+  },
+  {
+    template_id: 'minimal-clean',
+    export_template_id: 'minimal-clean',
+    template_name: 'Minimal Clean Executive',
+    description: 'Whitespace-first executive template for concise, modern, and data-driven decks.',
+    best_for: 'Consulting, operations, internal updates, product roadmaps',
+    visual_style: 'Minimal, editorial, premium',
+    layout_pattern: {
+      title_slide: 'clean monochrome cover with accent line',
+      content_slides: 'text-first grids and focused bullet structure',
+      data_slides: 'full-width data modules',
+      section_divider: 'minimal line and label',
+    },
+    color_scheme: {
+      primary: '#0D6EFD',
+      secondary: '#6F42C1',
+      accent: '#4F9CF9',
+      background: '#FFFFFF',
+      text: '#212529',
+    },
+    font_style: {
+      heading: 'Calibri',
+      body: 'Calibri',
+    },
+    thumbnail_description: 'White canvas with crisp blue accents and minimal geometry.',
+    preview_image: 'https://images.pexels.com/photos/7688336/pexels-photo-7688336.jpeg?auto=compress&cs=tinysrgb&w=900',
+    master_background_image: 'https://images.pexels.com/photos/7130469/pexels-photo-7130469.jpeg?auto=compress&cs=tinysrgb&w=1400',
+  },
+];
+
+export function getTemplateCatalog() {
+  return TEMPLATE_CATALOG;
+}
+
+export function getTemplateById(templateId) {
+  return TEMPLATE_CATALOG.find(t => t.template_id === templateId) || null;
+}

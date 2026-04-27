@@ -1,14 +1,41 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import axios from 'axios';
+import { getTemplateCatalog, getTemplateById } from './templateCatalog.js';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function ensureEnvLoaded() {
+  const hasRapid = !!(process.env.RAPIDAPI_API_URL && process.env.RAPIDAPI_HOST && process.env.RAPIDAPI_KEY);
+  if (hasRapid) return;
+
+  const candidates = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '..', '.env'),
+    path.resolve(__dirname, '..', '..', '.env'),
+  ];
+
+  for (const envPath of candidates) {
+    dotenv.config({ path: envPath });
+    if (process.env.RAPIDAPI_API_URL && process.env.RAPIDAPI_HOST && process.env.RAPIDAPI_KEY) {
+      break;
+    }
+  }
+}
 
 // ============================================================================
 // STEP 1 — Prompt Enhancer
 // ============================================================================
-const ENHANCE_PROMPT = (userInput) => `You are a professional presentation strategist and content architect.
+const ENHANCE_PROMPT = (userInput, options = {}) => `You are a professional presentation strategist and content architect.
 
 A user wants to create a PowerPoint presentation. Your job is to enhance their rough topic/idea into a detailed, structured presentation brief.
 
 User's raw input: "${userInput}"
+
+Required slide count: ${options.slideCount || '10'}
 
 Return a JSON object with this structure:
 {
@@ -34,47 +61,32 @@ Return ONLY the raw JSON object. Do not wrap in markdown or backticks.`;
 // ============================================================================
 // STEP 2 — Template Suggester
 // ============================================================================
-const TEMPLATE_SUGGEST_PROMPT = (briefJSON) => `You are a PowerPoint design expert.
+const TEMPLATE_RANK_PROMPT = (briefJSON, templateCatalog) => `You are a PowerPoint design expert.
 
 Based on this presentation brief:
 ${JSON.stringify(briefJSON)}
 
-Suggest exactly 4 slide layout templates suited to this topic. Each template defines the visual pattern used THROUGHOUT the presentation.
+Available real PPTX templates:
+${JSON.stringify(templateCatalog.map(t => ({
+  template_id: t.template_id,
+  template_name: t.template_name,
+  best_for: t.best_for,
+  description: t.description,
+  visual_style: t.visual_style,
+  layout_pattern: t.layout_pattern,
+})))}
 
-Return a JSON array:
-[
-  {
-    "template_id": "T1",
-    "template_name": "string (catchy name e.g. 'Bold Splitter')",
-    "description": "2-sentence description of the visual style",
-    "best_for": "what kind of content/audience this suits",
-    "layout_pattern": {
-      "title_slide": "full-bleed image with centered title overlay",
-      "content_slides": "alternating | image-left-text-right | text-left-image-right | top-image-bottom-text | icon-grid",
-      "data_slides": "chart-left-insight-right | full-width-chart | split-stats",
-      "section_divider": "color-block | minimal-line | full-image"
-    },
-    "color_scheme": {
-      "primary": "#hex",
-      "secondary": "#hex",
-      "accent": "#hex",
-      "background": "#hex",
-      "text": "#hex"
-    },
-    "font_style": {
-      "heading": "font name",
-      "body": "font name"
-    },
-    "thumbnail_description": "Describe how a thumbnail of this template looks in 1 sentence"
-  }
-]
+Select exactly 4 template IDs that best match the brief.
+
+Return a JSON array of template IDs only:
+["modern-gradient", "ocean-breeze", "minimal-clean", "sunset-warm"]
 
 Return ONLY the raw JSON array. Do not wrap in markdown or backticks.`;
 
 // ============================================================================
 // STEP 3 — Slide Content Generator
 // ============================================================================
-const SLIDE_CONTENT_PROMPT = (briefJSON, templateJSON) => `You are a professional presentation writer and visual designer.
+const SLIDE_CONTENT_PROMPT = (briefJSON, templateJSON, desiredCount) => `You are a professional presentation writer and visual designer.
 
 Presentation Brief:
 ${JSON.stringify(briefJSON)}
@@ -113,6 +125,7 @@ Generate a complete slide deck. Return a JSON array where each object is one sli
 ]
 
 Rules:
+- Generate EXACTLY ${desiredCount} slides
 - Alternate image positions across slides (left → right → left) to create visual rhythm
 - Every 3rd slide should be a data or stat slide
 - Use the section-divider layout between major sections
@@ -121,46 +134,44 @@ Rules:
 
 Return ONLY the raw JSON array. Do not wrap in markdown or backticks.`;
 
-// ============================================================================
-// STEP 4 — Image Prompt Refiner
-// ============================================================================
-const REFINE_IMAGE_PROMPT = (rawPrompt, tone, primary, secondary, accent) =>
-  `You are an expert at writing prompts for AI image generation.
-
-Refine this image prompt for a professional PowerPoint slide:
-"${rawPrompt}"
-
-Presentation tone: ${tone}
-Color palette: ${primary}, ${secondary}, ${accent}
-
-Return a single improved prompt (max 60 words) that:
-- Specifies realistic/illustrative style appropriate for business presentations
-- Mentions the color palette direction
-- Avoids any text, logos, or watermarks in the image
-- Specifies lighting and composition (e.g. "soft studio lighting, centered composition")
-- Is optimized for a 16:9 widescreen or half-slide panel
-
-Return ONLY the refined prompt string.`;
-
-
 class PresentationPipeline {
   constructor() {
-    this.genAI = null;
     this._initialized = false;
+    this.rapidConfig = null;
+    this.rapidGeminiConfig = null;
+    this.genAI = null;
   }
 
   _ensureInit() {
     if (this._initialized) return;
     this._initialized = true;
-    
-    const key = process.env.GEMINI_API_KEY;
 
-    if (key) {
-      this.genAI = new GoogleGenerativeAI(key);
-      const maskedKey = key.substring(0, 4) + '...' + key.length;
-      console.log(`🔗 PresentationPipeline: Gemini AI connected (Key: ${maskedKey})`);
+    ensureEnvLoaded();
+    
+    this.rapidConfig = {
+      baseUrl: (process.env.RAPIDAPI_API_URL || '').replace(/\/$/, ''),
+      host: process.env.RAPIDAPI_HOST || '',
+      key: process.env.RAPIDAPI_KEY || '',
+      model: process.env.RAPIDAPI_MODEL || 'conversationgpt4-2',
+      timeoutMs: Number(process.env.RAPIDAPI_REQUEST_TIMEOUT || 60) * 1000,
+    };
+
+    this.rapidGeminiConfig = {
+      baseUrl: (process.env.RAPIDAPI_GEMINI_API_URL || (process.env.RAPIDAPI_GEMINI_HOST ? `https://${process.env.RAPIDAPI_GEMINI_HOST}` : '')).replace(/\/$/, ''),
+      host: process.env.RAPIDAPI_GEMINI_HOST || '',
+      key: process.env.RAPIDAPI_GEMINI_KEY || process.env.RAPIDAPI_GEMINI_RAPIDAPI_KEY || '',
+      model: process.env.RAPIDAPI_GEMINI_MODEL || 'gemini-1.5-pro',
+      timeoutMs: Number(process.env.RAPIDAPI_REQUEST_TIMEOUT || 60) * 1000,
+    };
+
+    if (process.env.GEMINI_API_KEY) {
+      this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    }
+
+    if (this.rapidConfig.baseUrl && this.rapidConfig.host && this.rapidConfig.key) {
+      console.log(`🔗 PresentationPipeline: RapidAPI connected (${this.rapidConfig.host})`);
     } else {
-      console.warn('⚠️  PresentationPipeline: No GEMINI_API_KEY found');
+      console.warn('⚠️  PresentationPipeline: RapidAPI env is incomplete.');
     }
   }
 
@@ -195,34 +206,169 @@ class PresentationPipeline {
     }
   }
 
+  _extractTextFromRapidResponse(data) {
+    if (!data) return '';
+
+    if (Array.isArray(data?.choices) && data.choices[0]?.message?.content) {
+      return data.choices[0].message.content;
+    }
+
+    const candidates = [
+      data.result,
+      data.response,
+      data.message,
+      data.content,
+      data.output,
+      data.text,
+      data.generated_text,
+      data?.data?.result,
+      data?.data?.message,
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && candidate.trim()) {
+        return candidate;
+      }
+    }
+
+    return '';
+  }
+
+  _buildRapidEndpoints(config) {
+    return [
+      config.baseUrl,
+      `${config.baseUrl}/chat/completions`,
+      `${config.baseUrl}/chat`,
+      `${config.baseUrl}/conversationgpt4`,
+      `${config.baseUrl}/text`,
+      `${config.baseUrl}/generate`,
+    ];
+  }
+
+  async _postToRapidApiWithConfig(payload, config) {
+    if (!config?.baseUrl || !config?.host || !config?.key) {
+      throw new Error('RapidAPI config incomplete');
+    }
+
+    const endpoints = this._buildRapidEndpoints(config);
+
+    let lastError = null;
+    for (const endpoint of endpoints) {
+      try {
+        const payloadWithModel = {
+          ...payload,
+          model: payload?.model || config.model,
+        };
+
+        const resp = await axios.post(endpoint, payloadWithModel, {
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rapidapi-key': config.key,
+            'x-rapidapi-host': config.host,
+          },
+          timeout: config.timeoutMs,
+        });
+
+        const text = this._extractTextFromRapidResponse(resp.data);
+        if (text) return text;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error('RapidAPI request failed');
+  }
+
+  async _postToRapidApi(payload) {
+    let primaryError = null;
+
+    try {
+      return await this._postToRapidApiWithConfig(payload, this.rapidConfig);
+    } catch (error) {
+      primaryError = error;
+    }
+
+    const shouldUseGeminiRapidFallback =
+      !!(this.rapidGeminiConfig?.baseUrl && this.rapidGeminiConfig?.host && this.rapidGeminiConfig?.key) &&
+      [429, 402, 403].includes(Number(primaryError?.response?.status));
+
+    if (shouldUseGeminiRapidFallback) {
+      const fallbackPayload = {
+        ...payload,
+        model: this.rapidGeminiConfig.model,
+      };
+
+      try {
+        console.warn('⚠️ Primary RapidAPI exhausted, retrying with RapidAPI Gemini host...');
+        return await this._postToRapidApiWithConfig(fallbackPayload, this.rapidGeminiConfig);
+      } catch {
+        // fall through to existing fallback below
+      }
+    }
+
+    throw primaryError || new Error('RapidAPI request failed');
+  }
+
   async _generate(prompt) {
     this._ensureInit();
-    if (!this.genAI) throw new Error('GEMINI_API_KEY not configured');
+    if (!this.rapidConfig?.baseUrl || !this.rapidConfig?.host || !this.rapidConfig?.key) {
+      this._initialized = false;
+      this._ensureInit();
+    }
 
-    const modelName = process.env.AI_MODEL || 'gemini-2.5-flash';
-    const model = this.genAI.getGenerativeModel({ 
-      model: modelName,
-      generationConfig: {
-        responseMimeType: "application/json"
+    if (!this.rapidConfig?.baseUrl || !this.rapidConfig?.host || !this.rapidConfig?.key) {
+      throw new Error('RapidAPI config missing (RAPIDAPI_API_URL, RAPIDAPI_HOST, RAPIDAPI_KEY)');
+    }
+
+    const payload = {
+      model: this.rapidConfig.model,
+      temperature: 0.55,
+      max_tokens: 4000,
+      messages: [
+        { role: 'system', content: 'Return only valid JSON unless user asks plain text.' },
+        { role: 'user', content: prompt },
+      ],
+    };
+
+    try {
+      return await this._postToRapidApi(payload);
+    } catch (error) {
+      if (!this.genAI) {
+        throw error;
       }
-    });
-    
-    const result = await model.generateContent(prompt);
-    return result.response.text();
+
+      console.warn('⚠️ RapidAPI failed, falling back to Gemini for pipeline:', error?.response?.status || error.message);
+      const modelName = process.env.AI_MODEL || 'gemini-2.5-flash';
+      const model = this.genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    }
   }
 
   // ============================================================================
   // STEP 1 — Enhance Topic
   // ============================================================================
-  async enhanceTopic(userInput) {
-    const text = await this._generate(ENHANCE_PROMPT(userInput));
-    const brief = this._parseJSON(text);
+  async enhanceTopic(userInput, options = {}) {
+    const normalizedSlideCount = Math.max(4, Math.min(20, Number(options.slideCount) || 10));
+    let brief;
+
+    try {
+      const text = await this._generate(ENHANCE_PROMPT(userInput, {
+        slideCount: normalizedSlideCount,
+        language: options.language || 'auto',
+      }));
+      brief = this._parseJSON(text);
+    } catch (error) {
+      console.warn('⚠️ Enhance topic fallback used:', error?.response?.status || error.message);
+      brief = this._buildFallbackBrief(userInput, normalizedSlideCount);
+    }
 
     if (!brief.enhanced_topic || !brief.sections || !Array.isArray(brief.sections)) {
       throw new Error('Invalid enhanced brief structure');
     }
 
-    brief.suggested_slide_count = brief.suggested_slide_count || 10;
+    brief.suggested_slide_count = normalizedSlideCount;
+    brief.language_preference = options.language || 'auto';
     brief.tone = brief.tone || 'professional';
     brief.target_audience = brief.target_audience || 'General audience';
     brief.visual_themes = brief.visual_themes || ['minimalist'];
@@ -233,77 +379,79 @@ class PresentationPipeline {
   }
 
   // ============================================================================
-  // STEP 2 — Suggest Templates with Freepik
+  // STEP 2 — Suggest Real PPTX Templates
   // ============================================================================
   async suggestTemplates(enhancedBrief) {
-    const text = await this._generate(TEMPLATE_SUGGEST_PROMPT(enhancedBrief));
-    const templates = this._parseJSON(text);
+    const catalog = getTemplateCatalog();
+    let rankedIds = catalog.slice(0, 4).map(t => t.template_id);
 
-    if (!Array.isArray(templates) || templates.length === 0) {
-      throw new Error('Invalid templates response');
+    try {
+      const text = await this._generate(TEMPLATE_RANK_PROMPT(enhancedBrief, catalog));
+      const parsed = this._parseJSON(text);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        rankedIds = parsed.filter(id => typeof id === 'string');
+      }
+    } catch (error) {
+      console.warn('⚠️ Template ranking fallback used:', error.message);
     }
 
-    const freepikKey = process.env.FREEPIK_API_KEY || 'FPSX409e6228daaa25d7169b3ee40952d183';
-
-    return await Promise.all(templates.slice(0, 4).map(async (t, i) => {
-      const templateData = {
-        template_id: t.template_id || `T${i + 1}`,
-        template_name: t.template_name || `Template ${i + 1}`,
-        description: t.description || '',
-        best_for: t.best_for || '',
-        layout_pattern: {
-          title_slide: t.layout_pattern?.title_slide || 'full-bleed image with centered title overlay',
-          content_slides: t.layout_pattern?.content_slides || 'alternating',
-          data_slides: t.layout_pattern?.data_slides || 'chart-left-insight-right',
-          section_divider: t.layout_pattern?.section_divider || 'color-block',
-        },
-        color_scheme: {
-          primary: t.color_scheme?.primary || '#6C63FF',
-          secondary: t.color_scheme?.secondary || '#FF6B6B',
-          accent: t.color_scheme?.accent || '#00D2FF',
-          background: t.color_scheme?.background || '#FFFFFF',
-          text: t.color_scheme?.text || '#333333',
-        },
-        font_style: {
-          heading: t.font_style?.heading || 'Calibri',
-          body: t.font_style?.body || 'Calibri',
-        },
-        thumbnail_description: t.thumbnail_description || '',
-        master_background_image: null,
-      };
-
-      // Fetch presentation template background from Freepik
-      try {
-        const query = encodeURIComponent(`presentation background ${templateData.color_scheme.primary} abstract`);
-        const resp = await axios.get(`https://api.freepik.com/v1/resources?term=${query}&filters[orientation]=landscape&limit=3`, {
-          headers: { 'x-freepik-api-key': freepikKey },
-          timeout: 8000
-        });
-        if (resp.data?.data?.length > 0) {
-          // Pick a pseudo-random image from the top 3 results
-          const img = resp.data.data[i % resp.data.data.length];
-          templateData.master_background_image = img.image?.source?.url || img.image?.url;
-        }
-      } catch (err) {
-        console.warn(`⚠️ Freepik API Failed for Template ${i+1}:`, err.response?.data || err.message);
+    const selected = [];
+    for (const templateId of rankedIds) {
+      const template = getTemplateById(templateId);
+      if (template && !selected.find(t => t.template_id === template.template_id)) {
+        selected.push(template);
       }
+      if (selected.length === 4) break;
+    }
 
-      return templateData;
-    }));
+    if (selected.length < 4) {
+      for (const template of catalog) {
+        if (!selected.find(t => t.template_id === template.template_id)) {
+          selected.push(template);
+        }
+        if (selected.length === 4) break;
+      }
+    }
+
+    return selected;
   }
 
   // ============================================================================
   // STEP 3 — Generate Slide Content
   // ============================================================================
   async generateSlideContent(enhancedBrief, selectedTemplate) {
-    const text = await this._generate(SLIDE_CONTENT_PROMPT(enhancedBrief, selectedTemplate));
-    const slides = this._parseJSON(text);
+    const desiredCount = Math.max(4, Math.min(20, Number(enhancedBrief?.suggested_slide_count) || 10));
+    let slides = [];
 
-    if (!Array.isArray(slides) || slides.length === 0) {
-      throw new Error('Invalid slides response');
+    try {
+      const text = await this._generate(SLIDE_CONTENT_PROMPT(enhancedBrief, selectedTemplate, desiredCount));
+      slides = this._parseJSON(text);
+      if (!Array.isArray(slides) || slides.length === 0) {
+        throw new Error('Invalid slides response');
+      }
+    } catch (error) {
+      console.warn('⚠️ Slide content fallback used:', error?.response?.status || error.message);
+      slides = this._buildFallbackSlides(enhancedBrief, desiredCount);
     }
 
-    return slides.map((s, i) => ({
+    const normalizedSlides = slides.slice(0, desiredCount);
+    while (normalizedSlides.length < desiredCount) {
+      normalizedSlides.push({
+        slide_number: normalizedSlides.length + 1,
+        slide_type: normalizedSlides.length === desiredCount - 1 ? 'closing' : 'content',
+        layout: 'full-text',
+        title: `Slide ${normalizedSlides.length + 1}`,
+        subtitle: '',
+        body_text: [],
+        speaker_notes: '',
+        image_prompt: enhancedBrief?.enhanced_topic || 'professional business presentation',
+        image_position: 'none',
+        data_visual: { type: 'none', data: {}, insight_label: '' },
+        design_notes: { background_color: '', text_color: '', emphasis_word: '' },
+      });
+    }
+
+    return normalizedSlides.map((s, i) => ({
       slide_number: s.slide_number || i + 1,
       slide_type: s.slide_type || 'content',
       layout: s.layout || 'full-text',
@@ -326,6 +474,84 @@ class PresentationPipeline {
     }));
   }
 
+  _buildFallbackBrief(userInput, slideCount) {
+    const topic = userInput?.trim() || 'Presentation Topic';
+    const sections = [
+      { section_title: 'Introduction', purpose: 'Set context and define the topic scope.', suggested_slides: 1 },
+      { section_title: 'Current Landscape', purpose: 'Explain background, trends, and key drivers.', suggested_slides: 2 },
+      { section_title: 'Core Analysis', purpose: 'Present key ideas, insights, and practical implications.', suggested_slides: Math.max(2, Math.floor(slideCount / 3)) },
+      { section_title: 'Recommendations', purpose: 'Provide clear, actionable next steps.', suggested_slides: 1 },
+      { section_title: 'Conclusion', purpose: 'Summarize takeaways and close with impact.', suggested_slides: 1 },
+    ];
+
+    return {
+      enhanced_topic: topic,
+      target_audience: 'General professional audience',
+      tone: 'professional',
+      key_message: `A structured understanding of ${topic} helps improve decisions and outcomes.`,
+      suggested_slide_count: slideCount,
+      sections,
+      data_points_to_include: [
+        'Relevant market trend or growth statistic',
+        'A before/after comparison',
+        'A performance or impact KPI',
+      ],
+      visual_themes: ['minimalist', 'data-driven'],
+      color_mood: 'corporate blue',
+      language_preference: 'auto',
+    };
+  }
+
+  _buildFallbackSlides(brief, desiredCount) {
+    const topic = brief?.enhanced_topic || 'Presentation Topic';
+    const titleSlide = {
+      slide_number: 1,
+      slide_type: 'title',
+      layout: 'full-bleed-image',
+      title: topic,
+      subtitle: brief?.key_message || 'Professional presentation overview',
+      body_text: [],
+      speaker_notes: `Introduce ${topic} and explain the objective of this presentation.`,
+      image_prompt: `${topic} professional business background`,
+      image_position: 'background',
+      data_visual: { type: 'none', data: {}, insight_label: '' },
+      design_notes: { background_color: '', text_color: '', emphasis_word: '' },
+    };
+
+    const sectionNames = Array.isArray(brief?.sections) && brief.sections.length > 0
+      ? brief.sections.map((s) => s.section_title)
+      : ['Introduction', 'Analysis', 'Recommendations', 'Conclusion'];
+
+    const slides = [titleSlide];
+    for (let i = 2; i <= desiredCount; i++) {
+      const isLast = i === desiredCount;
+      const sectionTitle = sectionNames[(i - 2) % sectionNames.length];
+      slides.push({
+        slide_number: i,
+        slide_type: isLast ? 'closing' : (i % 3 === 0 ? 'data' : 'content'),
+        layout: i % 2 === 0 ? 'text-left-image-right' : 'image-left-text-right',
+        title: isLast ? 'Conclusion & Next Steps' : `${sectionTitle}: Key Point ${i - 1}`,
+        subtitle: isLast ? 'Action plan' : '',
+        body_text: isLast
+          ? ['Recap the most important insights', 'Define immediate next actions', 'Set measurable success criteria']
+          : ['Clarify the main idea in one sentence', 'Provide one practical implication', 'Support with one clear example'],
+        speaker_notes: isLast
+          ? 'Summarize the presentation and propose concrete next steps.'
+          : `Discuss how this point relates to ${topic} and why it matters.`,
+        image_prompt: `${topic} ${sectionTitle} professional photo`,
+        image_position: i % 2 === 0 ? 'right' : 'left',
+        data_visual: {
+          type: i % 3 === 0 ? 'stat-callout' : 'none',
+          data: i % 3 === 0 ? { metric: 'KPI', value: 'Value' } : {},
+          insight_label: i % 3 === 0 ? 'This metric highlights impact.' : '',
+        },
+        design_notes: { background_color: '', text_color: '', emphasis_word: '' },
+      });
+    }
+
+    return slides;
+  }
+
   // ============================================================================
   // STEP 4 — Extract Keywords & Search Pixabay
   // ============================================================================
@@ -342,8 +568,11 @@ class PresentationPipeline {
     }
   }
 
-  async generateSlideImages(slides, tone, colorScheme) {
-    const pixabayKey = process.env.PIXABAY_API_KEY || '37488321-da707b30e65b22686f4cd3d92';
+  async generateSlideImages(slides) {
+    const pixabayKey = process.env.PIXABAY_API_KEY;
+    const pixabayBase = (process.env.PIXABAY_API_URL || 'https://pixabay.com/api/').replace(/\/$/, '');
+    const perPage = Math.max(3, Math.min(20, Number(process.env.PIXABAY_PER_PAGE || 8)));
+    const safeSearch = String(process.env.PIXABAY_SAFESEARCH || 'true').toLowerCase() !== 'false';
 
     const results = await Promise.allSettled(
       slides.map(async (slide) => {
@@ -353,11 +582,18 @@ class PresentationPipeline {
 
         // Refine the prompt to 2-3 snappy keywords for Pixabay
         const searchKeywords = await this.refineImagePrompt(slide.image_prompt);
-        const encodedQuery = encodeURIComponent(searchKeywords);
+        const encodedQuery = encodeURIComponent(searchKeywords || 'business presentation');
         
         let imageUrl = '';
         try {
-          const resp = await axios.get(`https://pixabay.com/api/?key=${pixabayKey}&q=${encodedQuery}&image_type=photo&orientation=horizontal&safesearch=true&per_page=3`, { timeout: 10000 });
+          if (!pixabayKey) {
+            throw new Error('PIXABAY_API_KEY missing');
+          }
+
+          const resp = await axios.get(
+            `${pixabayBase}/?key=${pixabayKey}&q=${encodedQuery}&image_type=photo&orientation=horizontal&safesearch=${safeSearch}&per_page=${perPage}`,
+            { timeout: 10000 }
+          );
           
           if (resp.data && resp.data.hits && resp.data.hits.length > 0) {
             // Grab the highest resolution preview available directly via URL
@@ -404,9 +640,7 @@ class PresentationPipeline {
 
     console.log('🖼️ Step 4: Finding images via Pixabay...');
     const slidesWithImages = await this.generateSlideImages(
-      slides,
-      enhancedBrief.tone,
-      selectedTemplate.color_scheme
+      slides
     );
     console.log('✅ Image search complete');
 
