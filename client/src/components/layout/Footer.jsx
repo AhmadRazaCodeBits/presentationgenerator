@@ -54,9 +54,8 @@ export default function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div style={{
+        <div className="footer-bottom" style={{
           borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 24,
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16,
         }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>© 2026 SlideEdge AI – All Rights Reserved</p>
           <div style={{ display: 'flex', gap: 16 }}>

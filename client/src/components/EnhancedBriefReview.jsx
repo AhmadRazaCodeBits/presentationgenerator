@@ -3,6 +3,20 @@ import { FiUsers, FiTarget, FiLayers, FiBarChart2, FiCheck, FiEdit3 } from 'reac
 export default function EnhancedBriefReview({ brief, onProceed, onEdit }) {
   if (!brief) return null;
 
+  const prettifyTopic = (value) => {
+    const raw = String(value || '').trim();
+    if (!raw) return 'Untitled topic';
+
+    return raw
+      .replace(/^create\s+(a\s+)?presentation\s+(about|on)\s+/i, '')
+      .replace(/^generate\s+(slides?|a\s+presentation)\s+(for|about|on)\s+/i, '')
+      .replace(/^make\s+(a\s+)?(pitch\s+deck|presentation)\s+(for|about|on)\s+/i, '')
+      .trim() || raw;
+  };
+
+  const topic = prettifyTopic(brief.source_topic || brief.enhanced_topic);
+  const subtopic = brief.subtopic || brief.enhanced_topic || '';
+
   return (
     <div style={{
       background: 'var(--surface)', borderRadius: 'var(--radius-lg)',
@@ -18,23 +32,39 @@ export default function EnhancedBriefReview({ brief, onProceed, onEdit }) {
           📋 Presentation Brief
         </h3>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          AI has enhanced your topic into a structured presentation plan
+          Your topic is ready as a structured presentation plan
         </p>
       </div>
 
       <div style={{ padding: '20px 24px' }}>
-        {/* Enhanced Topic */}
+        {/* Topic + Subtopic */}
         <div style={{ marginBottom: 20 }}>
-          <h4 style={{
-            fontSize: '1.2rem', fontWeight: 800, marginBottom: 6,
-            background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          <div style={{
+            display: 'grid', gridTemplateColumns: '110px 1fr', rowGap: 8, columnGap: 10,
+            alignItems: 'start',
           }}>
-            {brief.enhanced_topic}
-          </h4>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-            "{brief.key_message}"
-          </p>
+            <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              Topic
+            </p>
+            <p style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              {topic}
+            </p>
+            <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+              Subtopic
+            </p>
+            <p style={{
+              fontSize: '1.05rem', fontWeight: 800,
+              background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>
+              {subtopic}
+            </p>
+          </div>
+          {!!brief.key_message && (
+            <p style={{ fontSize: '0.83rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginTop: 8 }}>
+              {brief.key_message}
+            </p>
+          )}
         </div>
 
         {/* Meta badges */}

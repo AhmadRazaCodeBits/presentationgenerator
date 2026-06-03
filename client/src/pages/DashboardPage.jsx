@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { presentationService } from '../services/presentationService';
 import toast from 'react-hot-toast';
-import { FiPlus, FiTrash2, FiDownload, FiEdit3, FiFileText, FiClock, FiGrid, FiSearch, FiFile } from 'react-icons/fi';
+import { FiPlus, FiTrash2, FiDownload, FiEdit3, FiFileText, FiClock, FiGrid, FiSearch } from 'react-icons/fi';
 
 export default function DashboardPage() {
   const { user, isAuthenticated } = useAuth();
@@ -47,17 +47,14 @@ export default function DashboardPage() {
     window.open(presentationService.getExportPPTXUrl(id), '_blank');
   };
 
-  const handleExportPDF = (id) => {
-    window.open(presentationService.getExportPDFUrl(id), '_blank');
-  };
+  
 
   const templateColors = {
-    'modern-gradient': ['#6C63FF', '#FF6B6B'],
-    'dark-professional': ['#1a1a2e', '#e94560'],
-    'ocean-breeze': ['#0077b6', '#00b4d8'],
-    'sunset-warm': ['#ff6b35', '#ff9f1c'],
-    'emerald-nature': ['#2d6a4f', '#52b788'],
-    'minimal-clean': ['#e2e8f0', '#0d6efd'],
+    'business': ['#1E3A8A', '#3B82F6'],
+    'technology': ['#6F42C1', '#D946EF'],
+    'creative': ['#FF6B35', '#FF9F1C'],
+    'minimal': ['#111827', '#4B5563'],
+    'professional': ['#0D6EFD', '#6C757D'],
   };
 
   const filtered = presentations.filter(p => {
@@ -83,7 +80,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid-4" style={{ gap: 16, marginBottom: 40 }}>
+        <div className="grid-4 stats-grid" style={{ gap: 16, marginBottom: 40 }}>
           {[
             { icon: <FiGrid />, label: 'Total Presentations', value: presentations.length, color: 'var(--primary)' },
             { icon: <FiFileText />, label: 'Total Slides', value: presentations.reduce((acc, p) => acc + (p.slides?.length || 0), 0), color: 'var(--secondary)' },
@@ -168,23 +165,34 @@ export default function DashboardPage() {
                     background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`,
                     padding: 20, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
                     color: 'white', cursor: 'pointer', transition: 'opacity 0.2s',
+                    position: 'relative',
                   }}
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+                    <div style={{
+                      position: 'absolute', top: 10, left: 10,
+                      fontSize: '0.62rem', fontWeight: 700, letterSpacing: 0.4,
+                      color: 'white', background: 'rgba(255,255,255,0.2)',
+                      backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.25)',
+                      borderRadius: 4, padding: '3px 8px',
+                    }}>
+                      {pres.template === 'technology' ? 'Vibrant Tech' : pres.template === 'creative' ? 'Creative Marketing' : pres.template === 'minimal' ? 'Minimal Clean' : pres.template === 'professional' ? 'Corporate' : 'Modern Business'}
+                    </div>
                     <h4 style={{ fontWeight: 700, fontSize: '1.05rem', color: 'white' }}>{pres.title}</h4>
                     <p style={{ fontSize: '0.75rem', opacity: 0.8 }}>{pres.slides?.length || 0} slides • {pres.language === 'ur' ? 'اردو' : 'English'}</p>
                   </div>
                   <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {new Date(pres.createdAt).toLocaleDateString()}
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        {new Date(pres.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button onClick={() => navigate(`/editor/${pres._id}`)} className="btn-icon btn-ghost" title="Edit"
                         style={{ width: 32, height: 32, fontSize: '0.85rem', color: 'var(--primary)' }}><FiEdit3 /></button>
                       <button onClick={() => handleExportPPTX(pres._id)} className="btn-icon btn-ghost" title="Download PPTX"
                         style={{ width: 32, height: 32, fontSize: '0.85rem', color: '#f97316' }}><FiDownload /></button>
-                      <button onClick={() => handleExportPDF(pres._id)} className="btn-icon btn-ghost" title="Download PDF"
-                        style={{ width: 32, height: 32, fontSize: '0.85rem', color: '#3b82f6' }}><FiFile /></button>
+                      
                       <button onClick={() => handleDelete(pres._id)} className="btn-icon btn-ghost" title="Delete"
                         style={{ width: 32, height: 32, fontSize: '0.85rem', color: 'var(--secondary)' }}><FiTrash2 /></button>
                     </div>

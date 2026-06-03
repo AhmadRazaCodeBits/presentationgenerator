@@ -23,10 +23,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ paddingTop: 100, minHeight: '100vh', background: 'var(--bg-secondary)' }}>
+    <div className="auth-page-wrapper" style={{ minHeight: '100vh', background: 'var(--bg-secondary)' }}>
       <div className="container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center', maxWidth: 1100 }}>
         {/* Form Side */}
-        <div style={{ animation: 'fadeInUp 0.6s ease-out' }}>
+        <div className="auth-form-wrapper" style={{ animation: 'fadeInUp 0.6s ease-out' }}>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: 8 }}>
             Login to <span className="gradient-text">SlideEdge</span>
           </h1>

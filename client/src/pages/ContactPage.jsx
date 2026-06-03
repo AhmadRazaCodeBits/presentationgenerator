@@ -60,26 +60,26 @@ export default function ContactPage() {
           </div>
 
           {/* Form Side */}
-          <form onSubmit={handleSubmit} style={{
-            background: 'var(--bg-secondary)', padding: 32, borderRadius: 'var(--radius-xl)',
+          <form onSubmit={handleSubmit} className="contact-form" style={{
+            background: 'var(--bg-secondary)', borderRadius: 'var(--radius-xl)',
             border: '1px solid var(--border-light)', animation: 'fadeInUp 0.6s ease-out 0.2s backwards',
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <label className="label">Name</label>
                 <input className="input" placeholder="Your name"
-                  value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+                   value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
               </div>
               <div>
                 <label className="label">Email</label>
                 <input type="email" className="input" placeholder="you@example.com"
-                  value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                   value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
               </div>
               <div>
                 <label className="label">Message</label>
                 <textarea className="input" rows={4} placeholder="Your message..."
-                  style={{ resize: 'vertical' }}
-                  value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
+                   style={{ resize: 'vertical' }}
+                   value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} />
               </div>
               <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
                 {loading ? <span className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} /> : <><FiSend /> Send Message</>}
@@ -88,7 +88,15 @@ export default function ContactPage() {
           </form>
         </div>
       </div>
-      <style>{`@media(max-width:768px){.contact-grid{grid-template-columns:1fr!important;}}`}</style>
+      <style>{`
+        .contact-form {
+          padding: 32px;
+        }
+        @media(max-width:768px){
+          .contact-grid{grid-template-columns:1fr!important;}
+          .contact-form{padding: 20px;}
+        }
+      `}</style>
     </div>
   );
 }

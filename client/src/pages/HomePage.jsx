@@ -30,7 +30,7 @@ export default function HomePage() {
         <div style={{ position: 'absolute', top: -20, right: -40, width: 300, height: 300, borderRadius: '50%', background: 'rgba(255,107,107,0.12)', filter: 'blur(80px)', animation: 'blob 7s infinite 2s' }} />
         <div style={{ position: 'absolute', bottom: -40, left: '30%', width: 350, height: 350, borderRadius: '50%', background: 'rgba(168,85,247,0.1)', filter: 'blur(80px)', animation: 'blob 7s infinite 4s' }} />
 
-        <div className="container" style={{ position: 'relative', zIndex: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}>
+        <div className="container hero-grid" style={{ position: 'relative', zIndex: 2, display: 'grid', gap: 60, alignItems: 'center' }}>
           {/* Left Content */}
           <div style={{ animation: 'fadeInUp 0.8s ease-out' }}>
             <div style={{
@@ -43,23 +43,37 @@ export default function HomePage() {
               🌍 Multilingual AI Powered | English + اردو
             </div>
 
-            <h1 style={{ fontSize: '3.5rem', fontWeight: 900, lineHeight: 1.1, marginBottom: 20 }}>
-              <span className="gradient-text">Create Stunning Presentations</span>
+            <h1 className="hero-title" style={{ fontWeight: 900, lineHeight: 1.1, marginBottom: 20 }}>
+              <span className="gradient-text">Build High-Impact Decks</span>
               <br />
-              <span style={{ color: 'var(--text-primary)' }}>with </span>
-              <span className="gradient-text">AI in Seconds</span>
+              <span style={{ color: 'var(--text-primary)' }}>and Retheme Them</span>
+              <br />
+              <span className="gradient-text">Without Rewriting Content</span>
             </h1>
 
             <p style={{ fontSize: '1.15rem', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: 32, maxWidth: 520 }}>
-              SlideEdge is an intelligent AI presentation generator that turns your ideas into professional slides instantly. Simply type your topic in English or Urdu.
+              SlideEdge is a presentation platform that turns rough ideas into polished slide decks, then lets you switch the template, refine the story, and export a presentation that feels designer-made.
             </p>
 
+            <div className="hero-stats-grid" style={{ display: 'grid', gap: 12, maxWidth: 560, marginBottom: 28 }}>
+              {[
+                { value: '3-step', label: 'Brief, template, deck' },
+                { value: '1-click', label: 'Change template later' },
+                { value: 'EN/UR', label: 'Bilingual output' },
+              ].map((stat) => (
+                <div key={stat.value} style={{
+                  padding: '14px 16px', borderRadius: 'var(--radius-lg)',
+                  background: 'rgba(255,255,255,0.7)', border: '1px solid var(--border-light)',
+                  boxShadow: 'var(--shadow-sm)',
+                }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: 'var(--text-primary)' }}>{stat.value}</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 4 }}>{stat.label}</div>
+                </div>
+              ))}
+            </div>
+
             {/* CTA Input */}
-            <div style={{
-              background: 'var(--surface)', padding: 8, borderRadius: 'var(--radius-lg)',
-              boxShadow: 'var(--shadow-xl)', display: 'flex', gap: 8, maxWidth: 520,
-              border: '1px solid var(--border-light)',
-            }}>
+            <div className="cta-input-group">
               <input type="text" placeholder="Type your topic... (e.g., Marketing Strategy)"
                 className="input" style={{ border: 'none', boxShadow: 'none', flex: 1, padding: '14px 16px' }}
               />
@@ -68,9 +82,31 @@ export default function HomePage() {
               </Link>
             </div>
 
+            {/* Quick Editor Link */}
+            <div style={{ marginTop: 12 }}>
+              <Link to="/quick-editor" style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '10px 16px', borderRadius: 'var(--radius-md)',
+                background: 'var(--bg-secondary)', color: 'var(--primary)',
+                textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600,
+                transition: 'all 0.2s', border: '1px solid var(--border-light)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'var(--surface)';
+                e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'var(--bg-secondary)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+              >
+                ✨ Try Quick Editor (No Signup)
+              </Link>
+            </div>
+
             {/* Trust badges */}
-            <div style={{ display: 'flex', gap: 24, marginTop: 24 }}>
-              {['No design skills', 'English & Urdu', 'Free to start'].map(text => (
+            <div style={{ display: 'flex', gap: 24, marginTop: 24, flexWrap: 'wrap' }}>
+              {['No design skills', 'English & Urdu', 'Retheme after generation', 'Export-ready output'].map(text => (
                 <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                   <FiCheck style={{ color: '#22c55e' }} /> {text}
                 </div>
@@ -127,9 +163,45 @@ export default function HomePage() {
         </div>
 
         <style>{`
+          .hero-title {
+            font-size: 3.5rem;
+          }
+          .hero-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+          .hero-stats-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+          .cta-input-group {
+            background: var(--surface);
+            padding: 8px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            display: flex;
+            gap: 8px;
+            max-width: 520px;
+            border: 1px solid var(--border-light);
+          }
           @media (max-width: 1024px) {
             .hero-visual { display: none !important; }
-            .container { grid-template-columns: 1fr !important; }
+            .hero-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
+            .hero-title { font-size: 3rem; }
+          }
+          @media (max-width: 768px) {
+            .hero-title { font-size: 2.25rem; }
+          }
+          @media (max-width: 576px) {
+            .hero-stats-grid {
+              grid-template-columns: 1fr !important;
+            }
+            .cta-input-group {
+              flex-direction: column;
+              padding: 12px;
+            }
+            .cta-input-group a {
+              width: 100%;
+              justify-content: center;
+            }
           }
         `}</style>
       </section>
@@ -159,28 +231,29 @@ export default function HomePage() {
       {/* ============ AI GENERATOR ============ */}
       <RevealSection>
         <section style={{ padding: '80px 0', background: 'var(--bg-secondary)' }}>
-          <div className="container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center' }}>
+          <div className="container template-studio-grid" style={{ display: 'grid', gap: 60, alignItems: 'center' }}>
             <div style={{
-              background: 'linear-gradient(135deg, #667eea, #764ba2)',
+              background: 'linear-gradient(135deg, #0f172a, #1d4ed8)',
               borderRadius: 'var(--radius-xl)', padding: 40,
               boxShadow: 'var(--shadow-xl)', aspectRatio: '4/3',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <div style={{ textAlign: 'center', color: 'white' }}>
-                <div style={{ fontSize: '4rem', marginBottom: 16 }}>🧠</div>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'white' }}>AI Brain</h3>
-                <p style={{ color: 'rgba(255,255,255,0.8)', marginTop: 8 }}>Analyzing your topic...</p>
+                <div style={{ fontSize: '4rem', marginBottom: 16 }}>🎛️</div>
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'white' }}>Template Studio</h3>
+                <p style={{ color: 'rgba(255,255,255,0.8)', marginTop: 8 }}>Switch the visual theme after generation</p>
               </div>
             </div>
             <div>
-              <h2 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: 16 }}>Generate Presentations with AI</h2>
+              <h2 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: 16 }}>Generate once, redesign anytime</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', marginBottom: 32 }}>
-                SlideEdge AI analyzes your topic and automatically creates structured presentations with titles, bullet points, and visuals.
+                Create a structured deck, then change the template later without losing your content or narrative.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 {[
                   { icon: <FiLayout />, title: 'Structured Content', desc: 'Logical flow with intro, body, and conclusion.', color: 'var(--primary)' },
                   { icon: <FiImage />, title: 'Smart Visuals', desc: 'AI suggests relevant images automatically.', color: 'var(--secondary)' },
+                  { icon: <FiLayout />, title: 'Template Studio', desc: 'Retheme the same content after generation.', color: '#22c55e' },
                 ].map(item => (
                   <div key={item.title} style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
                     <div style={{
@@ -197,7 +270,17 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <style>{`@media(max-width:1024px){section .container{grid-template-columns:1fr!important;}}`}</style>
+          <style>{`
+            .template-studio-grid {
+              grid-template-columns: 1fr 1fr;
+            }
+            @media (max-width: 1024px) {
+              .template-studio-grid {
+                grid-template-columns: 1fr !important;
+                gap: 32px !important;
+              }
+            }
+          `}</style>
         </section>
       </RevealSection>
 
@@ -239,12 +322,12 @@ export default function HomePage() {
       <RevealSection>
         <section style={{ padding: '80px 0', background: 'linear-gradient(to bottom, var(--bg-secondary), var(--surface))' }}>
           <div className="container">
-            <h2 style={{ fontSize: '2.2rem', fontWeight: 800, textAlign: 'center', marginBottom: 48 }}>Create in 3 Simple Steps</h2>
+            <h2 style={{ fontSize: '2.2rem', fontWeight: 800, textAlign: 'center', marginBottom: 48 }}>From idea to polished deck in 3 steps</h2>
             <div className="grid-3">
               {[
                 { num: 1, title: 'Enter Topic', desc: 'Type your topic in English or Urdu.', color: 'var(--primary)' },
-                { num: 2, title: 'AI Generates', desc: 'Our AI creates structure, content, and visuals.', color: 'var(--secondary)' },
-                { num: 3, title: 'Download', desc: 'Review, edit, and export to PowerPoint or PDF.', color: '#22c55e' },
+                { num: 2, title: 'Choose a Template', desc: 'Pick a visual direction and later retheme if needed.', color: 'var(--secondary)' },
+                { num: 3, title: 'Edit & Export', desc: 'Refine slides, present, and export to PowerPoint or PDF.', color: '#22c55e' },
               ].map(step => (
                 <div key={step.num} className="card" style={{ textAlign: 'left' }}>
                   <div style={{
@@ -268,17 +351,17 @@ export default function HomePage() {
         <section style={{ padding: '80px 0' }}>
           <div className="container" style={{ maxWidth: 900 }}>
             <div style={{
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899)',
+              background: 'linear-gradient(135deg, #0f172a, #1d4ed8, #22c55e)',
               borderRadius: 'var(--radius-xl)', padding: '64px 48px',
               textAlign: 'center', color: 'white', position: 'relative', overflow: 'hidden',
-              boxShadow: '0 25px 50px rgba(99,102,241,0.3)',
+              boxShadow: '0 25px 50px rgba(15,23,42,0.24)',
             }}>
               <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: 200, height: 200, background: 'rgba(255,255,255,0.1)', borderRadius: '50%', filter: 'blur(60px)' }} />
               <div style={{ position: 'absolute', bottom: '-10%', right: '-10%', width: 280, height: 280, background: 'rgba(255,255,255,0.08)', borderRadius: '50%', filter: 'blur(80px)' }} />
               <div style={{ position: 'relative', zIndex: 2 }}>
-                <h2 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: 16, color: 'white' }}>Ready To Create Amazing Presentations?</h2>
+                <h2 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: 16, color: 'white' }}>Ready to ship a better deck?</h2>
                 <p style={{ fontSize: '1.15rem', opacity: 0.9, marginBottom: 32, maxWidth: 600, margin: '0 auto 32px' }}>
-                  Join thousands of users turning ideas into professional presentations instantly.
+                  Turn a rough topic into a polished presentation, then retheme it until it feels right.
                 </p>
                 <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
                   <Link to="/signup" className="btn btn-lg" style={{ background: 'white', color: 'var(--primary)', fontWeight: 700, borderRadius: 'var(--radius-full)', boxShadow: '0 8px 25px rgba(0,0,0,0.15)' }}>

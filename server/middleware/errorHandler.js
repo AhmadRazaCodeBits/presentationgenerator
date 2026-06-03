@@ -38,7 +38,7 @@ export const errorHandler = (err, req, res, next) => {
 
   const statusCode = err.statusCode || 500;
   res.status(statusCode).json({
-    error: statusCode === 500 ? 'Internal Server Error' : (err.message || 'Internal Server Error'),
+    error: err.message || 'Internal Server Error',
     ...(! isProduction && { stack: err.stack }),
   });
 };

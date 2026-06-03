@@ -21,6 +21,7 @@ const slideSchema = new mongoose.Schema({
   notes: { type: String, default: '' },
   imageUrl: { type: String, default: '' },
   imageQuery: { type: String, default: '' },
+  image_alt: { type: String, default: '' },
   image_position: { type: String, enum: ['left', 'right', 'top', 'bottom', 'background', 'none'], default: 'none' },
   slide_type: { type: String, enum: ['title', 'content', 'data', 'image-focus', 'quote', 'section-divider', 'closing'], default: 'content' },
   layout: {
@@ -36,6 +37,49 @@ const slideSchema = new mongoose.Schema({
   data_visual: { type: dataVisualSchema, default: () => ({}) },
   design_notes: { type: designNotesSchema, default: () => ({}) },
 });
+
+function normalizeLayout(layout) {
+  if (!layout) return 'content';
+  const l = String(layout).toLowerCase().trim();
+  const validLayouts = [
+    'title', 'content', 'image-left', 'image-right', 'two-column', 'bullets', 'quote', 'blank',
+    'full-bleed-image', 'image-left-text-right', 'text-left-image-right',
+    'top-image-bottom-text', 'icon-grid', 'full-text',
+    'chart-left-text-right', 'split-stats', 'section-divider',
+  ];
+  if (validLayouts.includes(l)) return l;
+  
+  if (l === 'title slide') return 'title';
+  if (l === 'conclusion layout' || l === 'conclusion' || l === 'closing') return 'content';
+  if (l === 'feature grid' || l === 'icon grid') return 'icon-grid';
+
+  const hyphenated = l.replace(/\s+/g, '-');
+  if (validLayouts.includes(hyphenated)) return hyphenated;
+
+  const withoutLayoutSuffix = hyphenated.replace(/-layout$/, '').replace(/layout$/, '');
+  if (validLayouts.includes(withoutLayoutSuffix)) return withoutLayoutSuffix;
+
+  if (withoutLayoutSuffix === 'two-column') return 'two-column';
+  if (withoutLayoutSuffix === 'image-left') return 'image-left';
+  if (withoutLayoutSuffix === 'image-right') return 'image-right';
+  if (withoutLayoutSuffix === 'statistics') return 'split-stats';
+  if (withoutLayoutSuffix === 'comparison') return 'two-column';
+  if (withoutLayoutSuffix === 'process-flow') return 'content';
+  if (withoutLayoutSuffix === 'swot') return 'icon-grid';
+  if (withoutLayoutSuffix === 'pyramid') return 'content';
+  if (withoutLayoutSuffix === 'roadmap') return 'content';
+  if (withoutLayoutSuffix === 'full-data') return 'full-text';
+
+  return 'content';
+}
+
+slideSchema.pre('validate', function(next) {
+  if (this.layout) {
+    this.layout = normalizeLayout(this.layout);
+  }
+  next();
+});
+
 
 const templateSchemaObj = new mongoose.Schema({
   template_id: String,
@@ -74,6 +118,9 @@ const presentationSchema = new mongoose.Schema({
   isPublic: { type: Boolean, default: false },
   status: { type: String, enum: ['draft', 'completed', 'archived'], default: 'draft' },
   pipelineVersion: { type: Number, default: 2 },
+  twoslidesJobId: { type: String, default: '' },
+  twoslidesDownloadUrl: { type: String, default: '' },
+  twoslidesFileLocalPath: { type: String, default: '' },
 }, { timestamps: true });
 
 // Index for faster queries

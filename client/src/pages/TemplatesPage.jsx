@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { presentationService } from '../services/presentationService';
+import TemplateStudio from '../components/TemplateStudio';
 
 const CATEGORIES = ['All', 'Business', 'Education', 'Startup', 'Corporate', 'General'];
 
@@ -23,13 +24,18 @@ export default function TemplatesPage() {
       try {
         const res = await presentationService.getTemplates();
         const data = (res.templates || []).map(t => ({
+          ...t,
           id: t.id,
-          name: t.name,
-          desc: t.description || 'Professional PPTX template ready for export.',
-          colors: [t.colors?.primary || '#6C63FF', t.colors?.secondary || '#FF6B6B'],
-          preview_image: t.preview_image || '',
+          template_name: t.name,
+          description: t.description || 'Professional PPTX template ready for export.',
           best_for: t.best_for || 'General presentations',
           category: getCategory(t),
+          color_scheme: {
+            primary: t.colors?.primary || '#6C63FF',
+            secondary: t.colors?.secondary || '#FF6B6B',
+            background: t.colors?.bg || '#FFFFFF',
+            text: t.colors?.heading || '#1E1E2E',
+          },
         }));
         setTemplates(data);
       } catch {
@@ -71,6 +77,14 @@ export default function TemplatesPage() {
             </button>
           ))}
         </div>
+
+        <TemplateStudio
+          templates={filtered}
+          activeTemplateId={filtered[0]?.id || ''}
+          onSelect={() => {}}
+          title="Browse Templates"
+          description="Explore the built-in themes. Use any of them as a base and retheme after generation."
+        />
 
         {/* Template Grid */}
         <div className="grid-3" style={{ gap: 28 }}>
@@ -147,6 +161,29 @@ export default function TemplatesPage() {
 
       <style>{`
         .template-card:hover .template-overlay { opacity: 1 !important; }
+        @media (max-width: 1024px) {
+          .template-overlay {
+            opacity: 1 !important;
+            background: rgba(0,0,0,0.05) !important;
+            position: relative !important;
+            inset: auto !important;
+            height: 48px;
+            margin-top: 12px;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+          }
+          .template-overlay .btn {
+            width: 100%;
+            background: var(--primary) !important;
+            color: white !important;
+            border-radius: var(--radius-sm);
+            padding: 10px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          }
+        }
       `}</style>
     </div>
   );

@@ -14,7 +14,7 @@ router.get('/history', protect, getChatHistory);
 router.get('/history/:id', protect, getChatById);
 
 // Pipeline multi-step
-router.post('/enhance', optionalAuth, enhanceTopic);
+router.post('/enhance', optionalAuth, upload.single('file'), enhanceTopic);
 router.post('/suggest-templates', optionalAuth, suggestTemplates);
 router.post('/generate-pipeline', optionalAuth, generatePipelineSlides);
 

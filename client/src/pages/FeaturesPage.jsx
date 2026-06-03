@@ -18,6 +18,11 @@ const FEATURES = [
     checks: ['Context-based visuals', 'High quality images'],
   },
   {
+    icon: <FiLayout />, title: 'Template Retheming', color: '#22c55e', bg: '#f0fdf4',
+    desc: 'Change the visual template after content is generated so the story stays intact while the look evolves.',
+    checks: ['Same content, new theme', 'One-click template switching'],
+  },
+  {
     icon: <FiGlobe />, title: 'Bilingual Support', color: '#22c55e', bg: '#f0fdf4',
     desc: 'Generate presentations in both English and Urdu, making it accessible for a wider audience.',
     checks: ['Urdu slide generation', 'RTL text support'],
@@ -73,9 +78,9 @@ export default function FeaturesPage() {
         </div>
 
         {/* More Features Banner */}
-        <div style={{
+        <div className="more-features-banner" style={{
           background: 'linear-gradient(135deg, rgba(108,99,255,0.06), rgba(255,107,107,0.06))',
-          borderRadius: 'var(--radius-xl)', padding: '48px 40px',
+          borderRadius: 'var(--radius-xl)',
           textAlign: 'center', position: 'relative', overflow: 'hidden',
         }}>
           <div style={{ position: 'absolute', top: -50, right: -50, width: 300, height: 300, background: 'rgba(108,99,255,0.06)', borderRadius: '50%', filter: 'blur(60px)' }} />

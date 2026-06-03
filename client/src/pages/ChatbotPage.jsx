@@ -4,7 +4,7 @@ import { chatService } from '../services/chatService';
 import { presentationService } from '../services/presentationService';
 import { useAuth } from '../context/AuthContext';
 import EnhancedBriefReview from '../components/EnhancedBriefReview';
-import TemplateSuggestionCard from '../components/TemplateSuggestionCard';
+import TemplateStudio from '../components/TemplateStudio';
 import SlideGenerationProgress from '../components/SlideGenerationProgress';
 import toast from 'react-hot-toast';
 import {
@@ -19,14 +19,21 @@ const LANGUAGES = [
   { id: 'ur', label: 'اردو (Urdu)', icon: '🇵🇰', flag: 'UR' },
 ];
 
-const SLIDE_COUNTS = [6, 8, 10, 12, 15, 18];
+const SLIDE_COUNTS = Array.from({ length: 20 }, (_, i) => i + 1);
 
-const SUGGESTIONS = [
-  'Create a presentation about Artificial Intelligence',
-  'Generate slides for Digital Marketing Strategy',
-  'پاکستان کی معیشت پر پریزنٹیشن بنائیں',
-  'Make a pitch deck for a startup',
-];
+const CLASS_PRESENTATION_DEFAULTS = {
+  tone: 'academic',
+  audience: 'studentsAcademics',
+  structure: 'overview',
+  depth: 'standard',
+  presType: 'informational',
+  statsLevel: 'includeStats',
+  speakerNotes: true,
+  visualHints: true,
+  animHints: false,
+  includeQA: true,
+  includeKey: true,
+};
 
 // Pipeline steps
 const STEP = {
@@ -38,6 +45,49 @@ const STEP = {
   GENERATING: 'generating',
   DONE: 'done',
 };
+function asText(value, fallback = '') {
+  if (value == null) return fallback;
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (typeof value === 'object') {
+    // Avoid rendering raw JSON-like objects in UI text blocks.
+    return fallback;
+  }
+  return String(value).trim();
+}
+
+function normalizeBullets(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => asText(item, ''))
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function normalizeSlides(slides = []) {
+  return (Array.isArray(slides) ? slides : []).map((slide, index) => {
+    const heading = asText(slide?.heading || slide?.title, `Slide ${index + 1}`);
+    const content = asText(slide?.content, '') || asText(slide?.body_text, '');
+    const bullets = normalizeBullets(slide?.bullets || slide?.body_text);
+
+    return {
+      ...slide,
+      heading,
+      subtitle: asText(slide?.subtitle, ''),
+      content,
+      bullets,
+      notes: asText(slide?.notes || slide?.speaker_notes, ''),
+      imageUrl: asText(slide?.imageUrl, ''),
+      slide_type: asText(slide?.slide_type, 'content') || 'content',
+      layout: asText(slide?.layout, 'content') || 'content',
+    };
+  });
+}
 
 export default function ChatbotPage() {
   const [messages, setMessages] = useState([]);
@@ -54,14 +104,27 @@ export default function ChatbotPage() {
   const [enhancedBrief, setEnhancedBrief] = useState(null);
   const [suggestedTemplates, setSuggestedTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [isSearchingTemplates, setIsSearchingTemplates] = useState(false);
   const [genProgress, setGenProgress] = useState({ step: 'content', currentSlide: 0, totalSlides: 0 });
 
   // UI state
   const [selectedLanguage, setSelectedLanguage] = useState('auto');
-  const [selectedSlideCount, setSelectedSlideCount] = useState(10);
+  const [selectedSlideCount, setSelectedSlideCount] = useState(14);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [attachedFile, setAttachedFile] = useState(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+
+  const selectedTone = CLASS_PRESENTATION_DEFAULTS.tone;
+  const selectedAudience = CLASS_PRESENTATION_DEFAULTS.audience;
+  const selectedStructure = CLASS_PRESENTATION_DEFAULTS.structure;
+  const selectedDepth = CLASS_PRESENTATION_DEFAULTS.depth;
+  const selectedPresType = CLASS_PRESENTATION_DEFAULTS.presType;
+  const selectedStatsLevel = CLASS_PRESENTATION_DEFAULTS.statsLevel;
+  const speakerNotes = CLASS_PRESENTATION_DEFAULTS.speakerNotes;
+  const visualHints = CLASS_PRESENTATION_DEFAULTS.visualHints;
+  const animHints = CLASS_PRESENTATION_DEFAULTS.animHints;
+  const includeQA = CLASS_PRESENTATION_DEFAULTS.includeQA;
+  const includeKey = CLASS_PRESENTATION_DEFAULTS.includeKey;
 
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -146,11 +209,11 @@ export default function ChatbotPage() {
       content: `${topic}${langLabel}${slideLabel}${fileLabel}`,
     }]);
 
-    // Step 1: Enhance Topic
+    // Step 1: Build Topic Brief
     setPipelineStep(STEP.ENHANCING);
     setMessages(prev => [...prev, {
       role: 'assistant',
-      content: '🚀 **Step 1/3** — Analyzing your topic and creating a structured brief...',
+      content: '🚀 **Step 1/3** — Preparing a structured brief from your topic...',
       type: 'status',
     }]);
 
@@ -158,7 +221,7 @@ export default function ChatbotPage() {
       const enhanceResult = await chatService.enhanceTopic(topic, {
         slideCount: selectedSlideCount,
         language: selectedLanguage,
-      });
+      }, attachedFile);
 
       if (enhanceResult.success && enhanceResult.brief) {
         setEnhancedBrief(enhanceResult.brief);
@@ -169,16 +232,16 @@ export default function ChatbotPage() {
           const updated = prev.filter(m => m.type !== 'status');
           return [...updated, {
             role: 'assistant',
-            content: `✅ I've analyzed your topic and created a presentation plan for **"${enhanceResult.brief.enhanced_topic}"** with ${enhanceResult.brief.suggested_slide_count} slides across ${enhanceResult.brief.sections?.length || 0} sections.\n\nReview the brief below and click **Choose Template** to continue.`,
+            content: `✅ I've prepared a presentation plan for **"${enhanceResult.brief.enhanced_topic}"** with ${enhanceResult.brief.suggested_slide_count} slides across ${enhanceResult.brief.sections?.length || 0} sections.\n\nReview the brief below and click **Choose Template** to continue.`,
             type: 'brief',
             brief: enhanceResult.brief,
           }];
         });
       } else {
-        throw new Error('Failed to enhance topic');
+        throw new Error('Failed to prepare topic brief');
       }
     } catch (error) {
-      const errMsg = error.response?.data?.error || error.message || 'Failed to enhance topic';
+      const errMsg = error.response?.data?.error || error.message || 'Failed to prepare topic brief';
       setMessages(prev => {
         const updated = prev.filter(m => m.type !== 'status');
         return [...updated, { role: 'assistant', content: `❌ ${errMsg}. Please try again.` }];
@@ -235,6 +298,35 @@ export default function ChatbotPage() {
     setSelectedTemplate(template);
   };
 
+  const handleSearchTemplates = async (searchKeyword) => {
+    if (!enhancedBrief || !searchKeyword.trim()) return;
+    setIsSearchingTemplates(true);
+    try {
+      const templateResult = await chatService.suggestTemplates(enhancedBrief, searchKeyword.trim());
+      if (templateResult.success && templateResult.templates) {
+        setSuggestedTemplates(templateResult.templates);
+        // Find and update the templates message in messages state
+        setMessages(prev => prev.map(msg => {
+          if (msg.type === 'templates') {
+            return {
+              ...msg,
+              content: `✅ I've found **${templateResult.templates.length} templates** for search query "${searchKeyword}". Select one below to generate your slides.`,
+              templates: templateResult.templates
+            };
+          }
+          return msg;
+        }));
+        toast.success(`Found ${templateResult.templates.length} matching templates!`);
+      } else {
+        toast.error('Failed to search templates');
+      }
+    } catch (error) {
+      toast.error(error.message || 'Search failed');
+    } finally {
+      setIsSearchingTemplates(false);
+    }
+  };
+
   const handleGenerateSlides = async () => {
     if (!enhancedBrief || !selectedTemplate) {
       toast.error('Please select a template first');
@@ -261,24 +353,49 @@ export default function ChatbotPage() {
     }, 20000);
 
     try {
-      const result = await chatService.generatePipelineSlides(enhancedBrief, selectedTemplate);
+      // Ensure the brief contains an explicit image prompt and slide count
+      const briefForSend = {
+        ...enhancedBrief,
+        // prefer an explicit image prompt if present, otherwise fall back to the enhanced topic
+        image_prompt: enhancedBrief.image_prompt || enhancedBrief.imageQuery || enhancedBrief.enhanced_topic,
+        suggested_slide_count: enhancedBrief.suggested_slide_count || selectedSlideCount,
+      };
+
+      const result = await chatService.generatePipelineSlides(briefForSend, selectedTemplate, {
+        language: selectedLanguage,
+        slideCount: selectedSlideCount,
+        tone: selectedTone,
+        audience: selectedAudience,
+        structure: selectedStructure,
+        depth: selectedDepth,
+        presType: selectedPresType,
+        statsLevel: selectedStatsLevel,
+        speakerNotes,
+        visualHints,
+        animHints,
+        includeQA,
+        includeKey,
+      });
 
       clearTimeout(progressTimer);
       clearTimeout(progressTimer2);
 
       if (result.success && result.data) {
-        const slideData = result.data.slides;
+        const slideData = normalizeSlides(result.data.slides);
         setSlides(slideData);
         setCurrentPresentationId(result.presentationId || null);
         setGenProgress({ step: 'done', currentSlide: slideData.length, totalSlides: slideData.length });
         setPipelineStep(STEP.DONE);
 
-        const slideList = slideData.map((s, i) => `**Slide ${i + 1}:** ${s.heading}`).join('\n');
+        const previewItems = slideData
+          .slice(0, 4)
+          .map((s, i) => `Slide ${i + 1}: ${s.heading}`)
+          .join(' | ');
         setMessages(prev => {
           const updated = prev.filter(m => m.type !== 'generating');
           return [...updated, {
             role: 'assistant',
-            content: `🎉 Your presentation is ready! **"${result.data.title}"** — ${slideData.length} slides with Pixabay stock images.\n\n${slideList}\n\n📝 Click any slide to edit. Use the toolbar to export or present.`,
+            content: `🎉 Your presentation is ready! "${asText(result.data.title, enhancedBrief?.enhanced_topic || 'Presentation')}" with ${slideData.length} polished slides.\n\n${previewItems}\n\n📝 Click any slide to edit. Use the toolbar to export or present.`,
             slides: slideData,
           }];
         });
@@ -305,15 +422,6 @@ export default function ChatbotPage() {
       e.preventDefault();
       handleSend();
     }
-  };
-
-  const handleSuggestion = (text) => {
-    setInput(text);
-    const urduRegex = /[\u0600-\u06FF]/;
-    if (urduRegex.test(text)) {
-      setSelectedLanguage('ur');
-    }
-    inputRef.current?.focus();
   };
 
   const resetChat = () => {
@@ -349,7 +457,8 @@ export default function ChatbotPage() {
   const addBullet = (slideIdx) => {
     setSlides(prev => {
       const updated = [...prev];
-      updated[slideIdx] = { ...updated[slideIdx], bullets: [...updated[slideIdx].bullets, 'New point'] };
+      const placeholder = selectedLanguage === 'ur' ? 'نیا نکتہ' : 'New point';
+      updated[slideIdx] = { ...updated[slideIdx], bullets: [...updated[slideIdx].bullets, placeholder] };
       return updated;
     });
   };
@@ -362,35 +471,13 @@ export default function ChatbotPage() {
         title: enhancedBrief?.enhanced_topic || slides[0]?.heading || 'Presentation',
         slides,
         language: selectedLanguage === 'ur' ? 'ur' : 'en',
-        template: selectedTemplate?.export_template_id || selectedTemplate?.template_id || 'modern-gradient',
+        template: selectedTemplate?.export_template_id || selectedTemplate?.template_id || 'business',
         templateData: selectedTemplate || null,
         pipelineVersion: 2,
       }).catch((error) => {
         const message = error?.response?.data?.error || (error?.response?.status === 413
           ? 'Presentation is too large to export in one request. Try fewer slides.'
           : 'Failed to download PPTX');
-        toast.error(message);
-      });
-    } else {
-      toast.error('Generate slides first to export.');
-    }
-  };
-
-  const handleExportPDF = () => {
-    if (currentPresentationId) {
-      window.open(presentationService.getExportPDFUrl(currentPresentationId), '_blank');
-    } else if (slides.length > 0) {
-      presentationService.downloadPublicPDF({
-        title: enhancedBrief?.enhanced_topic || slides[0]?.heading || 'Presentation',
-        slides,
-        language: selectedLanguage === 'ur' ? 'ur' : 'en',
-        template: selectedTemplate?.export_template_id || selectedTemplate?.template_id || 'modern-gradient',
-        templateData: selectedTemplate || null,
-        pipelineVersion: 2,
-      }).catch((error) => {
-        const message = error?.response?.data?.error || (error?.response?.status === 413
-          ? 'Presentation is too large to export in one request. Try fewer slides.'
-          : 'Failed to download PDF');
         toast.error(message);
       });
     } else {
@@ -440,47 +527,65 @@ export default function ChatbotPage() {
       return 'pending';
     };
 
+    const activeStepObj = steps.find(s => getStepState(s) === 'active') || steps[0];
+
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4, padding: '12px 16px',
-        background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-light)',
-      }}>
-        {steps.map((step, i) => {
-          const state = getStepState(step);
-          return (
-            <div key={step.key} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
+      <>
+        {/* Desktop Steps Indicator */}
+        <div className="pipeline-steps-desktop" style={{
+          display: 'flex', alignItems: 'center', gap: 4, padding: '12px 16px',
+          background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-light)',
+        }}>
+          {steps.map((step, i) => {
+            const state = getStepState(step);
+            return (
+              <div key={step.key} style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                 <div style={{
-                  width: 24, height: 24, borderRadius: '50%',
-                  background: state === 'done' ? '#22c55e' :
-                    state === 'active' ? 'var(--primary)' : 'var(--bg-secondary)',
-                  border: state === 'pending' ? '2px solid var(--border-light)' : 'none',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.7rem', fontWeight: 700,
-                  color: state === 'pending' ? 'var(--text-muted)' : 'white',
-                  transition: 'all 0.3s',
+                  display: 'flex', alignItems: 'center', gap: 6,
                 }}>
-                  {state === 'done' ? '✓' : step.num}
+                  <div style={{
+                    width: 24, height: 24, borderRadius: '50%',
+                    background: state === 'done' ? '#22c55e' :
+                      state === 'active' ? 'var(--primary)' : 'var(--bg-secondary)',
+                    border: state === 'pending' ? '2px solid var(--border-light)' : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.7rem', fontWeight: 700,
+                    color: state === 'pending' ? 'var(--text-muted)' : 'white',
+                    transition: 'all 0.3s',
+                  }}>
+                    {state === 'done' ? '✓' : step.num}
+                  </div>
+                  <span style={{
+                    fontSize: '0.75rem', fontWeight: state === 'active' ? 700 : 500,
+                    color: state === 'active' ? 'var(--primary)' : state === 'done' ? '#22c55e' : 'var(--text-muted)',
+                    transition: 'all 0.3s', whiteSpace: 'nowrap',
+                  }}>{step.label}</span>
                 </div>
-                <span style={{
-                  fontSize: '0.75rem', fontWeight: state === 'active' ? 700 : 500,
-                  color: state === 'active' ? 'var(--primary)' : state === 'done' ? '#22c55e' : 'var(--text-muted)',
-                  transition: 'all 0.3s', whiteSpace: 'nowrap',
-                }}>{step.label}</span>
+                {i < steps.length - 1 && (
+                  <div style={{
+                    flex: 1, height: 2, marginLeft: 8, borderRadius: 1,
+                    background: state === 'done' ? '#22c55e' : 'var(--border-light)',
+                    transition: 'background 0.3s',
+                  }} />
+                )}
               </div>
-              {i < steps.length - 1 && (
-                <div style={{
-                  flex: 1, height: 2, marginLeft: 8, borderRadius: 1,
-                  background: state === 'done' ? '#22c55e' : 'var(--border-light)',
-                  transition: 'background 0.3s',
-                }} />
-              )}
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+
+        {/* Mobile Steps Indicator */}
+        <div className="pipeline-steps-mobile" style={{
+          display: 'none', padding: '8px 16px', background: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border-light)', justifyContent: 'space-between', alignItems: 'center'
+        }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--primary)' }}>
+            Step {activeStepObj.num}/4: {activeStepObj.label}
+          </span>
+          <div style={{ width: '40%', height: 6, background: 'var(--border-light)', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ width: `${(activeStepObj.num / 4) * 100}%`, height: '100%', background: 'var(--primary)', borderRadius: 3 }} />
+          </div>
+        </div>
+      </>
     );
   };
 
@@ -506,7 +611,7 @@ export default function ChatbotPage() {
                 {enhancedBrief?.enhanced_topic?.substring(0, 40) || 'Processing...'}
               </p>
               <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                {pipelineStep === STEP.ENHANCING ? '⏳ Analyzing...' :
+                {pipelineStep === STEP.ENHANCING ? '⏳ Preparing...' :
                  pipelineStep === STEP.BRIEF_REVIEW ? '📋 Review brief' :
                  pipelineStep === STEP.SUGGESTING ? '⏳ Generating templates...' :
                  pipelineStep === STEP.TEMPLATE_SELECT ? '🎨 Select template' :
@@ -562,7 +667,7 @@ export default function ChatbotPage() {
                   display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 28,
                   flexWrap: 'wrap',
                 }}>
-                  {['📋 Analyze Topic', '🎨 Design Template', '📊 Generate Slides'].map(s => (
+                  {['📋 Prepare Topic', '🎨 Design Template', '📊 Generate Slides'].map(s => (
                     <span key={s} style={{
                       padding: '6px 14px', borderRadius: 'var(--radius-full)',
                       background: 'rgba(108,99,255,0.08)', fontSize: '0.82rem',
@@ -570,20 +675,9 @@ export default function ChatbotPage() {
                     }}>{s}</span>
                   ))}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-                  {SUGGESTIONS.map(s => (
-                    <button key={s} onClick={() => handleSuggestion(s)} style={{
-                      padding: '12px 16px', borderRadius: 'var(--radius-md)',
-                      background: 'var(--surface)', border: '1px solid var(--border-light)',
-                      fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'left',
-                      transition: 'all 0.2s', cursor: 'pointer',
-                    }}
-                    onMouseEnter={e => { e.target.style.borderColor = 'var(--primary)'; e.target.style.color = 'var(--primary)'; }}
-                    onMouseLeave={e => { e.target.style.borderColor = 'var(--border-light)'; e.target.style.color = 'var(--text-secondary)'; }}>
-                      "{s}"
-                    </button>
-                  ))}
-                </div>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  Enter a topic to generate a class-ready presentation.
+                </p>
               </div>
             )}
 
@@ -620,20 +714,61 @@ export default function ChatbotPage() {
                 {/* Embedded Template Selection */}
                 {msg.type === 'templates' && msg.templates && pipelineStep === STEP.TEMPLATE_SELECT && (
                   <div style={{ marginTop: 12, marginLeft: 48 }}>
+                    {/* Template Search Input Bar */}
                     <div style={{
-                      display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
-                      gap: 12, marginBottom: 16,
+                      display: 'flex',
+                      gap: 8,
+                      marginBottom: 16,
+                      background: 'var(--surface)',
+                      padding: '10px 14px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-light)',
+                      boxShadow: 'var(--shadow-sm)',
+                      alignItems: 'center'
                     }}>
-                      {msg.templates.map((t, ti) => (
-                        <div key={ti} style={{ animationDelay: `${ti * 0.1}s` }}>
-                          <TemplateSuggestionCard
-                            template={t}
-                            isSelected={selectedTemplate?.template_id === t.template_id}
-                            onSelect={handleTemplateSelect}
-                          />
-                        </div>
-                      ))}
+                      <input
+                        type="text"
+                        placeholder="🔍 Search more 2Slides themes (e.g. AI, startup, dark, clean)..."
+                        id="chatbot-template-search-field"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            handleSearchTemplates(e.target.value);
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          border: 'none',
+                          background: 'transparent',
+                          outline: 'none',
+                          fontSize: '0.85rem',
+                          color: 'var(--text-primary)',
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          const val = document.getElementById('chatbot-template-search-field')?.value;
+                          if (val) handleSearchTemplates(val);
+                        }}
+                        disabled={isSearchingTemplates}
+                        className="btn btn-primary btn-sm"
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: '0.78rem',
+                          height: 'auto',
+                          minHeight: 'auto',
+                        }}
+                      >
+                        {isSearchingTemplates ? 'Searching...' : 'Search'}
+                      </button>
                     </div>
+
+                    <TemplateStudio
+                      templates={msg.templates}
+                      activeTemplateId={selectedTemplate?.template_id || selectedTemplate?.id}
+                      onSelect={handleTemplateSelect}
+                      title="Choose a Template"
+                      description="Pick a visual direction. You can still retheme the finished deck later."
+                    />
                     {selectedTemplate && (
                       <button onClick={handleGenerateSlides} className="btn btn-primary" style={{
                         width: '100%', padding: '14px 20px', borderRadius: 'var(--radius-md)',
@@ -657,7 +792,7 @@ export default function ChatbotPage() {
                 <div className="message-content">
                   <div className="typing-dots"><span /><span /><span /></div>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                    Analyzing your topic and building a structured brief...
+                    Preparing a structured brief from your topic...
                   </p>
                 </div>
               </div>
@@ -728,7 +863,7 @@ export default function ChatbotPage() {
             <div style={{ maxWidth: 720, margin: '0 auto', position: 'relative' }}>
               <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }}
                 onChange={(e) => handleFileSelect(e)} />
-              <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.txt" style={{ display: 'none' }}
+              <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.txt,.json" style={{ display: 'none' }}
                 onChange={(e) => handleFileSelect(e)} />
 
               <div style={{
@@ -861,6 +996,7 @@ export default function ChatbotPage() {
                   ))}
                 </select>
 
+
                 {/* Text Input */}
                 <input ref={inputRef} type="text" value={input} onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKeyPress}
@@ -887,11 +1023,10 @@ export default function ChatbotPage() {
                   {pipelineStep === STEP.DONE ? 'New' : 'Generate'}
                 </button>
               </div>
+
             </div>
 
-            <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 8 }}>
-              3-Step Pipeline: Analyze → Real PPTX Template → Generate • Text via RapidAPI • Images via Pixabay
-            </p>
+            
           </div>
         </div>
 
@@ -910,10 +1045,7 @@ export default function ChatbotPage() {
                     style={{ width: 32, height: 32, fontSize: '0.85rem' }} title="Download PPTX">
                     <FiDownload />
                   </button>
-                  <button onClick={handleExportPDF} className="btn-icon btn-ghost"
-                    style={{ width: 32, height: 32, fontSize: '0.85rem' }} title="Download PDF">
-                    <FiFileText />
-                  </button>
+                  
                   <button onClick={() => { setPresenterSlide(0); setShowPresenter(true); }} className="btn-icon btn-ghost"
                     style={{ width: 32, height: 32, fontSize: '0.85rem' }} title="Present fullscreen">
                     <FiMaximize2 />
@@ -929,7 +1061,7 @@ export default function ChatbotPage() {
             </div>
           </div>
 
-          <div style={{ flex: 1, overflow: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="chat-preview-list" style={{ flex: 1, overflow: 'auto', padding: 16 }}>
             {slides.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: 80 }}>
                 <FiFileText style={{ fontSize: '2.5rem', opacity: 0.3, marginBottom: 8 }} />
@@ -943,109 +1075,125 @@ export default function ChatbotPage() {
                 </p>
               </div>
             ) : (
-              slides.map((slide, idx) => (
-                <div key={idx} className="slide-preview-card" style={{
-                  animation: `fadeInUp 0.4s ease-out ${idx * 0.1}s backwards`,
-                  border: editingSlide === idx ? '2px solid var(--primary)' : '1px solid var(--border-light)',
-                }} onClick={() => setEditingSlide(editingSlide === idx ? null : idx)}>
-                  {/* Slide Thumbnail */}
-                  <div className="slide-thumb" style={{
-                    background: slide.slide_type === 'title' || slide.layout === 'title' || slide.layout === 'full-bleed-image'
-                      ? `linear-gradient(135deg, ${templateColors[0]}, ${templateColors[1]})`
-                      : slide.slide_type === 'section-divider' || slide.layout === 'section-divider'
-                      ? `linear-gradient(135deg, ${templateColors[0]}dd, ${templateColors[1]}dd)`
-                      : 'var(--surface)',
-                    padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                    position: 'relative',
+              slides.map((slide, idx) => {
+                const isEditing = editingSlide === idx;
+                return (
+                  <div key={idx} className={`slide-preview-card-wrapper ${isEditing ? 'active' : ''}`} style={{
+                    animation: `fadeInUp 0.4s ease-out ${idx * 0.1}s backwards`,
                   }}>
-                    {slide.imageUrl && (
-                      <img src={slide.imageUrl} alt="" style={{
-                        position: 'absolute', inset: 0, width: '100%', height: '100%',
-                        objectFit: 'cover',
-                        opacity: (slide.slide_type === 'title' || slide.layout === 'title') ? 0.3 : 0.15,
-                      }} />
-                    )}
-                    <div style={{ position: 'relative', zIndex: 2 }}>
-                      <h4 style={{
-                        fontSize: (slide.slide_type === 'title' || slide.layout === 'title') ? '0.95rem' : '0.8rem',
-                        fontWeight: 700,
-                        color: (slide.slide_type === 'title' || slide.slide_type === 'section-divider' || slide.layout === 'title' || slide.layout === 'section-divider')
-                          ? 'white' : 'var(--text-primary)',
-                        marginBottom: 4,
-                      }}>{slide.heading}</h4>
-                      {slide.subtitle && (
-                        <p style={{
-                          fontSize: '0.7rem',
-                          color: (slide.slide_type === 'title' || slide.slide_type === 'section-divider')
-                            ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
-                          marginBottom: 2,
-                        }}>{slide.subtitle}</p>
-                      )}
-                      {slide.slide_type !== 'title' && slide.slide_type !== 'section-divider' &&
-                        slide.layout !== 'title' && slide.layout !== 'section-divider' &&
-                        slide.bullets?.slice(0, 2).map((b, bi) => (
-                        <p key={bi} style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>• {b}</p>
-                      ))}
-                    </div>
+                    <div className={`slide-preview-card ${isEditing ? 'active' : ''}`} style={{
+                      border: isEditing ? '2px solid var(--primary)' : '1px solid var(--border-light)',
+                    }} onClick={() => setEditingSlide(isEditing ? null : idx)}>
+                      {/* Slide Thumbnail */}
+                      <div className="slide-thumb" style={{
+                        width: '100%',
+                        height: 'auto',
+                        minHeight: '180px',
+                        background: slide.slide_type === 'title' || slide.layout === 'title' || slide.layout === 'full-bleed-image'
+                          ? `linear-gradient(135deg, ${templateColors[0]}, ${templateColors[1]})`
+                          : slide.slide_type === 'section-divider' || slide.layout === 'section-divider'
+                          ? `linear-gradient(135deg, ${templateColors[0]}dd, ${templateColors[1]}dd)`
+                          : 'var(--surface)',
+                        padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start',
+                        position: 'relative',
+                        direction: selectedLanguage === 'ur' ? 'rtl' : 'ltr',
+                        textAlign: selectedLanguage === 'ur' ? 'right' : 'left',
+                      }}>
+                        {slide.imageUrl && (
+                          <img src={slide.imageUrl} alt="" style={{
+                            position: 'absolute', inset: 0, width: '100%', height: '100%',
+                            objectFit: 'cover',
+                            opacity: (slide.slide_type === 'title' || slide.layout === 'title') ? 0.3 : 0.15,
+                          }} />
+                        )}
+                        <div style={{ position: 'relative', zIndex: 2, margin: 'auto 0', width: '100%' }}>
+                          <h4 className={`slide-preview-heading ${(slide.slide_type === 'title' || slide.layout === 'title') ? 'title-slide' : ''}`} style={{
+                            fontWeight: 700,
+                            color: (slide.slide_type === 'title' || slide.slide_type === 'section-divider' || slide.layout === 'title' || slide.layout === 'section-divider')
+                              ? 'white' : 'var(--text-primary)',
+                            marginBottom: 4,
+                          }}>{slide.heading}</h4>
+                          {slide.subtitle && (
+                            <p className="slide-preview-subtitle" style={{
+                              color: (slide.slide_type === 'title' || slide.slide_type === 'section-divider')
+                                ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
+                              marginBottom: 2,
+                            }}>{slide.subtitle}</p>
+                          )}
+                          {slide.content && slide.slide_type !== 'title' && slide.slide_type !== 'section-divider' &&
+                            slide.layout !== 'title' && slide.layout !== 'section-divider' &&
+                            String(slide.content).trim() !== String(slide.subtitle || '').trim() && (
+                            <p className="slide-preview-bullet" style={{ color: 'var(--text-muted)', marginBottom: 6, direction: selectedLanguage === 'ur' ? 'rtl' : 'ltr', textAlign: selectedLanguage === 'ur' ? 'right' : 'left' }}>
+                              {slide.content}
+                            </p>
+                          )}
+                          {slide.slide_type !== 'title' && slide.slide_type !== 'section-divider' &&
+                            slide.layout !== 'title' && slide.layout !== 'section-divider' &&
+                            slide.bullets?.map((b, bi) => (
+                            <p key={bi} className="slide-preview-bullet" style={{ color: 'var(--text-muted)', direction: selectedLanguage === 'ur' ? 'rtl' : 'ltr', textAlign: selectedLanguage === 'ur' ? 'right' : 'left' }}>{selectedLanguage === 'ur' ? `${b} ●` : `• ${b}`}</p>
+                          ))}
+                        </div>
 
-                    {/* Slide type badge */}
-                    {slide.slide_type && slide.slide_type !== 'content' && (
-                      <span style={{
-                        position: 'absolute', top: 6, right: 6,
-                        fontSize: '0.6rem', fontWeight: 700, padding: '2px 6px',
-                        borderRadius: 'var(--radius-full)', background: 'rgba(0,0,0,0.2)',
-                        color: 'white', textTransform: 'uppercase',
-                      }}>{slide.slide_type}</span>
-                    )}
-                  </div>
-
-                  {/* Card Info */}
-                  <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {slide.heading}
-                    </span>
-                    <span style={{
-                      fontSize: '0.7rem', background: 'var(--bg-secondary)',
-                      padding: '2px 8px', borderRadius: 'var(--radius-full)',
-                      color: 'var(--text-muted)', flexShrink: 0,
-                    }}>Slide {idx + 1}</span>
-                  </div>
-
-                  {/* Inline Editor */}
-                  {editingSlide === idx && (
-                    <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border-light)', background: 'var(--bg-secondary)' }}
-                         onClick={e => e.stopPropagation()}>
-                      <div style={{ marginBottom: 10 }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Heading</label>
-                        <input className="input" style={{ fontSize: '0.85rem', padding: '8px 10px', marginTop: 4 }}
-                          value={slide.heading} onChange={e => updateSlide(idx, 'heading', e.target.value)} />
+                        {/* Slide type badge */}
+                        {slide.slide_type && slide.slide_type !== 'content' && (
+                          <span style={{
+                            position: 'absolute', top: 6, right: 6,
+                            fontSize: '0.6rem', fontWeight: 700, padding: '2px 6px',
+                            borderRadius: 'var(--radius-full)', background: 'rgba(0,0,0,0.2)',
+                            color: 'white', textTransform: 'uppercase',
+                          }}>{slide.slide_type}</span>
+                        )}
                       </div>
-                      {slide.subtitle !== undefined && (
-                        <div style={{ marginBottom: 10 }}>
-                          <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Subtitle</label>
-                          <input className="input" style={{ fontSize: '0.85rem', padding: '8px 10px', marginTop: 4 }}
-                            value={slide.subtitle || ''} onChange={e => updateSlide(idx, 'subtitle', e.target.value)} />
+
+                      {/* Card Info */}
+                      <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {slide.heading}
+                        </span>
+                        <span style={{
+                          fontSize: '0.7rem', background: 'var(--bg-secondary)',
+                          padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                          color: 'var(--text-muted)', flexShrink: 0,
+                        }}>Slide {idx + 1}</span>
+                      </div>
+
+                      {/* Inline Editor */}
+                      {editingSlide === idx && (
+                        <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border-light)', background: 'var(--bg-secondary)', direction: selectedLanguage === 'ur' ? 'rtl' : 'ltr', textAlign: selectedLanguage === 'ur' ? 'right' : 'left' }}
+                             onClick={e => e.stopPropagation()}>
+                          <div style={{ marginBottom: 10 }}>
+                            <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Heading</label>
+                            <input className="input" style={{ fontSize: '0.85rem', padding: '8px 10px', marginTop: 4, direction: selectedLanguage === 'ur' ? 'rtl' : 'ltr', textAlign: selectedLanguage === 'ur' ? 'right' : 'left' }}
+                              value={slide.heading} onChange={e => updateSlide(idx, 'heading', e.target.value)} />
+                          </div>
+                          {slide.subtitle !== undefined && (
+                            <div style={{ marginBottom: 10 }}>
+                              <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Subtitle</label>
+                              <input className="input" style={{ fontSize: '0.85rem', padding: '8px 10px', marginTop: 4, direction: selectedLanguage === 'ur' ? 'rtl' : 'ltr', textAlign: selectedLanguage === 'ur' ? 'right' : 'left' }}
+                                value={slide.subtitle || ''} onChange={e => updateSlide(idx, 'subtitle', e.target.value)} />
+                            </div>
+                          )}
+                          <div style={{ marginBottom: 10 }}>
+                            <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Content</label>
+                            <textarea className="input" rows={2} style={{ fontSize: '0.85rem', padding: '8px 10px', marginTop: 4, resize: 'vertical', direction: selectedLanguage === 'ur' ? 'rtl' : 'ltr', textAlign: selectedLanguage === 'ur' ? 'right' : 'left' }}
+                              value={slide.content} onChange={e => updateSlide(idx, 'content', e.target.value)} />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Bullet Points</label>
+                            {slide.bullets?.map((b, bi) => (
+                              <input key={bi} className="input" style={{ fontSize: '0.8rem', padding: '6px 10px', marginTop: 4, direction: selectedLanguage === 'ur' ? 'rtl' : 'ltr', textAlign: selectedLanguage === 'ur' ? 'right' : 'left' }}
+                                value={b} onChange={e => updateBullet(idx, bi, e.target.value)} />
+                            ))}
+                            <button onClick={() => addBullet(idx)} className="btn btn-sm btn-ghost" style={{ marginTop: 6, fontSize: '0.75rem', color: 'var(--primary)' }}>
+                              + Add Point
+                            </button>
+                          </div>
                         </div>
                       )}
-                      <div style={{ marginBottom: 10 }}>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Content</label>
-                        <textarea className="input" rows={2} style={{ fontSize: '0.85rem', padding: '8px 10px', marginTop: 4, resize: 'vertical' }}
-                          value={slide.content} onChange={e => updateSlide(idx, 'content', e.target.value)} />
-                      </div>
-                      <div>
-                        <label style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Bullet Points</label>
-                        {slide.bullets?.map((b, bi) => (
-                          <input key={bi} className="input" style={{ fontSize: '0.8rem', padding: '6px 10px', marginTop: 4 }}
-                            value={b} onChange={e => updateBullet(idx, bi, e.target.value)} />
-                        ))}
-                        <button onClick={() => addBullet(idx)} className="btn btn-sm btn-ghost" style={{ marginTop: 6, fontSize: '0.75rem', color: 'var(--primary)' }}>
-                          + Add Point
-                        </button>
-                      </div>
                     </div>
-                  )}
-                </div>
-              ))
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
@@ -1085,7 +1233,8 @@ export default function ChatbotPage() {
               alignItems: (slides[presenterSlide].slide_type === 'title' || slides[presenterSlide].slide_type === 'section-divider')
                 ? 'center' : 'flex-start',
               textAlign: (slides[presenterSlide].slide_type === 'title' || slides[presenterSlide].slide_type === 'section-divider')
-                ? 'center' : 'left',
+                ? 'center' : selectedLanguage === 'ur' ? 'right' : 'left',
+              direction: selectedLanguage === 'ur' ? 'rtl' : 'ltr',
             }}>
               <h1 style={{
                 fontSize: (slides[presenterSlide].slide_type === 'title' || slides[presenterSlide].slide_type === 'section-divider')
@@ -1102,11 +1251,15 @@ export default function ChatbotPage() {
                   fontWeight: 300,
                 }}>{slides[presenterSlide].subtitle}</p>
               )}
-              {slides[presenterSlide].content && (
+              {slides[presenterSlide].content &&
+               slides[presenterSlide].slide_type !== 'title' &&
+               slides[presenterSlide].slide_type !== 'section-divider' &&
+               slides[presenterSlide].layout !== 'Title Slide' &&
+               slides[presenterSlide].layout !== 'section-divider' &&
+               String(slides[presenterSlide].content).trim() !== String(slides[presenterSlide].subtitle || '').trim() && (
                 <p style={{
                   fontSize: '1.3rem', lineHeight: 1.7, marginBottom: 24, maxWidth: '70%',
-                  color: (slides[presenterSlide].slide_type === 'title' || slides[presenterSlide].slide_type === 'section-divider')
-                    ? 'rgba(255,255,255,0.85)' : '#555',
+                  color: '#555',
                 }}>{slides[presenterSlide].content}</p>
               )}
               {slides[presenterSlide].bullets?.length > 0 &&
@@ -1114,7 +1267,7 @@ export default function ChatbotPage() {
                 slides[presenterSlide].slide_type !== 'section-divider' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {slides[presenterSlide].bullets.map((b, i) => (
-                    <div key={i} style={{ fontSize: '1.2rem', color: '#333', display: 'flex', gap: 12 }}>
+                    <div key={i} style={{ fontSize: '1.2rem', color: '#333', display: 'flex', flexDirection: selectedLanguage === 'ur' ? 'row-reverse' : 'row', gap: 12 }}>
                       <span style={{ color: templateColors[0], fontWeight: 700 }}>●</span> {b}
                     </div>
                   ))}

@@ -28,7 +28,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div style={{ paddingTop: 100, minHeight: '100vh', background: 'var(--bg-secondary)' }}>
+    <div className="auth-page-wrapper" style={{ minHeight: '100vh', background: 'var(--bg-secondary)' }}>
       <div className="container" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 60, alignItems: 'center', maxWidth: 1100 }}>
         {/* Visual Side */}
         <div style={{ textAlign: 'center', animation: 'fadeInUp 0.6s ease-out' }} className="auth-visual">
@@ -51,7 +51,7 @@ export default function SignupPage() {
         </div>
 
         {/* Form Side */}
-        <div style={{ animation: 'fadeInUp 0.6s ease-out 0.2s backwards' }}>
+        <div className="auth-form-wrapper" style={{ animation: 'fadeInUp 0.6s ease-out 0.2s backwards' }}>
           <h1 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: 8 }}>
             Create Your <span className="gradient-text">Free Account</span>
           </h1>
@@ -69,8 +69,11 @@ export default function SignupPage() {
               </div>
               <div>
                 <label className="label">Last Name</label>
-                <input className="input" placeholder="Last Name"
-                  value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+                <div style={{ position: 'relative' }}>
+                  <FiUser style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input className="input" style={{ paddingLeft: 40 }} placeholder="Last Name"
+                    value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+                </div>
               </div>
             </div>
 

@@ -39,5 +39,12 @@ export const validateObjectId = [
 export const validatePresentation = [
   body('title').optional().trim().isLength({ min: 1, max: 200 }).withMessage('Title must be 1-200 chars'),
   body('slides').optional().isArray().withMessage('Slides must be an array'),
+  body('slides').optional().custom((slides) => {
+    if (!Array.isArray(slides)) return true; // other validator will fail
+    if (slides.length < 1 || slides.length > 20) {
+      throw new Error('Slides must contain between 1 and 20 items');
+    }
+    return true;
+  }),
   handleValidation,
 ];

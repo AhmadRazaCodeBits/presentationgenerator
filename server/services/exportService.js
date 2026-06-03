@@ -2,95 +2,103 @@ import PptxGenJS from 'pptxgenjs';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import axios from 'axios';
 import fs from 'fs';
+import path from 'path';
+import sharp from 'sharp';
 import { getTemplateCatalog } from './templateCatalog.js';
 
 // ============================================================================
-// PROFESSIONAL TEMPLATES — Rich presentation designs
+// PROFESSIONAL TEMPLATES — Rich presentation designs (IMPROVED)
 // ============================================================================
 const TEMPLATES = {
-  'modern-gradient': {
-    name: 'Modern Gradient',
-    titleBg: { fill: { type: 'solid', color: '6C63FF' } },
-    titleBgGrad: { color1: '6C63FF', color2: 'FF6B6B', angle: 135 },
+  'business': {
+    name: 'Modern Business Premium',
+    titleBg: { fill: { type: 'solid', color: '1E3A8A' } },
+    titleBgGrad: { color1: '1E3A8A', color2: '3B82F6', angle: 135 },
     contentBg: 'FFFFFF',
-    headingColor: '1E1E2E',
-    textColor: '555555',
-    accentColor: '6C63FF',
-    accent2: 'FF6B6B',
-    footerBg: 'F0F0FF',
-    bulletIcon: '●',
-    fontHeading: 'Calibri',
-    fontBody: 'Calibri',
-  },
-  'dark-professional': {
-    name: 'Dark Professional',
-    titleBg: { fill: { type: 'solid', color: '1a1a2e' } },
-    titleBgGrad: { color1: '1a1a2e', color2: '16213e', angle: 135 },
-    contentBg: '0f0f23',
-    headingColor: 'FFFFFF',
-    textColor: 'a0a0c0',
-    accentColor: 'e94560',
-    accent2: 'ff6b81',
-    footerBg: '0a0a18',
+    headingColor: '1E3A8A',
+    textColor: '1F2937',
+    accentColor: '1E3A8A',
+    accent2: '3B82F6',
+    footerBg: 'F3F4F6',
     bulletIcon: '▸',
-    fontHeading: 'Calibri',
-    fontBody: 'Calibri',
+    fontHeading: 'Arial',
+    fontBody: 'Segoe UI',
+    headingSize: 40,
+    bodySize: 13,
+    lineHeight: 1.5,
+    padding: 0.6,
   },
-  'ocean-breeze': {
-    name: 'Ocean Breeze',
-    titleBg: { fill: { type: 'solid', color: '0077b6' } },
-    titleBgGrad: { color1: '0077b6', color2: '00b4d8', angle: 135 },
-    contentBg: 'f0f9ff',
-    headingColor: '023e8a',
-    textColor: '444444',
-    accentColor: '0077b6',
-    accent2: '00b4d8',
-    footerBg: 'e3f2fd',
-    bulletIcon: '◆',
-    fontHeading: 'Calibri',
-    fontBody: 'Calibri',
+  'technology': {
+    name: 'Vibrant Tech Premium',
+    titleBg: { fill: { type: 'solid', color: '0F0F23' } },
+    titleBgGrad: { color1: '0F0F23', color2: '6F42C1', angle: 135 },
+    contentBg: '0F0F23',
+    headingColor: 'FFFFFF',
+    textColor: 'E6E8F2',
+    accentColor: '6F42C1',
+    accent2: 'D946EF',
+    footerBg: '16213E',
+    bulletIcon: '▹',
+    fontHeading: 'Arial',
+    fontBody: 'Segoe UI',
+    headingSize: 40,
+    bodySize: 13,
+    lineHeight: 1.5,
+    padding: 0.6,
   },
-  'sunset-warm': {
-    name: 'Sunset Warm',
-    titleBg: { fill: { type: 'solid', color: 'ff6b35' } },
-    titleBgGrad: { color1: 'ff6b35', color2: 'ff9f1c', angle: 135 },
-    contentBg: 'fffaf5',
-    headingColor: 'c44900',
-    textColor: '555555',
-    accentColor: 'ff6b35',
-    accent2: 'ff9f1c',
-    footerBg: 'fff0e0',
-    bulletIcon: '✦',
-    fontHeading: 'Calibri',
-    fontBody: 'Calibri',
+  'creative': {
+    name: 'Creative Marketing Premium',
+    titleBg: { fill: { type: 'solid', color: 'FF6B35' } },
+    titleBgGrad: { color1: 'FF6B35', color2: 'FF9F1C', angle: 135 },
+    contentBg: 'FFFAF5',
+    headingColor: '5C3A21',
+    textColor: '5C3A21',
+    accentColor: 'FF6B35',
+    accent2: 'FF9F1C',
+    footerBg: 'FFFAF5',
+    bulletIcon: '▸',
+    fontHeading: 'Arial',
+    fontBody: 'Segoe UI',
+    headingSize: 40,
+    bodySize: 13,
+    lineHeight: 1.5,
+    padding: 0.6,
   },
-  'emerald-nature': {
-    name: 'Emerald Nature',
-    titleBg: { fill: { type: 'solid', color: '2d6a4f' } },
-    titleBgGrad: { color1: '2d6a4f', color2: '52b788', angle: 135 },
-    contentBg: 'f0faf4',
-    headingColor: '1b4332',
-    textColor: '444444',
-    accentColor: '2d6a4f',
-    accent2: '52b788',
-    footerBg: 'e8f5ec',
-    bulletIcon: '●',
-    fontHeading: 'Calibri',
-    fontBody: 'Calibri',
-  },
-  'minimal-clean': {
-    name: 'Minimal Clean',
-    titleBg: { fill: { type: 'solid', color: '0d6efd' } },
-    titleBgGrad: { color1: '0d6efd', color2: '6f42c1', angle: 135 },
+  'minimal': {
+    name: 'Minimal Clean Premium',
+    titleBg: { fill: { type: 'solid', color: 'FFFFFF' } },
+    titleBgGrad: { color1: 'FFFFFF', color2: 'F3F4F6', angle: 135 },
     contentBg: 'FFFFFF',
+    headingColor: '111827',
+    textColor: '374151',
+    accentColor: '111827',
+    accent2: '4B5563',
+    footerBg: 'F9FAFB',
+    bulletIcon: '▸',
+    fontHeading: 'Arial',
+    fontBody: 'Segoe UI',
+    headingSize: 40,
+    bodySize: 13,
+    lineHeight: 1.5,
+    padding: 0.6,
+  },
+  'professional': {
+    name: 'Corporate Professional Premium',
+    titleBg: { fill: { type: 'solid', color: 'F8F9FA' } },
+    titleBgGrad: { color1: '0D6EFD', color2: '6C757D', angle: 135 },
+    contentBg: 'F8F9FA',
     headingColor: '212529',
-    textColor: '6c757d',
-    accentColor: '0d6efd',
-    accent2: '6f42c1',
-    footerBg: 'f8f9fa',
-    bulletIcon: '—',
-    fontHeading: 'Calibri',
-    fontBody: 'Calibri',
+    textColor: '212529',
+    accentColor: '0D6EFD',
+    accent2: '6C757D',
+    footerBg: 'E9ECEF',
+    bulletIcon: '▸',
+    fontHeading: 'Arial',
+    fontBody: 'Segoe UI',
+    headingSize: 40,
+    bodySize: 13,
+    lineHeight: 1.5,
+    padding: 0.6,
   },
 };
 
@@ -131,9 +139,13 @@ class ExportService {
       accentColor: strip(cs.primary) || '6C63FF',
       accent2: strip(cs.accent) || strip(cs.secondary) || 'FF6B6B',
       footerBg: strip(cs.background) || 'F0F0FF',
-      bulletIcon: '●',
-      fontHeading: templateData?.font_style?.heading || 'Calibri',
-      fontBody: templateData?.font_style?.body || 'Calibri',
+      bulletIcon: '▸',
+      fontHeading: templateData?.font_style?.heading || 'Arial',
+      fontBody: templateData?.font_style?.body || 'Segoe UI',
+      headingSize: 40,
+      bodySize: 13,
+      lineHeight: 1.5,
+      padding: 0.6,
     };
   }
 
@@ -196,10 +208,11 @@ class ExportService {
       if (t.master_background_image) {
         try {
           const resp = await axios.get(t.master_background_image, { responseType: 'arraybuffer', timeout: 8000 });
-          const b64 = Buffer.from(resp.data).toString('base64');
-          const mime = resp.headers['content-type'] || 'image/jpeg';
-          masterBackgroundDataUri = `data:${mime};base64,${b64}`;
-          console.log('✅ Fetched Freepik premium background for PPTX export');
+          // Optimize master background image
+          const optimizedBuffer = await this._optimizeImageBuffer(resp.data);
+          const b64 = optimizedBuffer.toString('base64');
+          masterBackgroundDataUri = `data:image/jpeg;base64,${b64}`;
+          console.log('✅ Fetched and optimized Freepik premium background for PPTX export');
         } catch (err) {
           console.warn('⚠️ Failed to fetch master background image:', err.message);
         }
@@ -221,16 +234,31 @@ class ExportService {
         } else if (slideData.imageUrl && slideData.imageUrl.startsWith('http')) {
           try {
             const resp = await axios.get(slideData.imageUrl, { responseType: 'arraybuffer', timeout: 8000 });
-            const b64 = Buffer.from(resp.data).toString('base64');
-            const mime = resp.headers['content-type'] || 'image/jpeg';
-            imageDataUri = `data:${mime};base64,${b64}`;
+            // Optimize image for PPTX: resize, convert to JPEG, compress
+            const optimizedBuffer = await this._optimizeImageBuffer(resp.data);
+            const b64 = optimizedBuffer.toString('base64');
+            imageDataUri = `data:image/jpeg;base64,${b64}`;
           } catch { /* skip image if download fails */ }
+        } else if (slideData.imageUrl && slideData.imageUrl.startsWith('/uploads/')) {
+          try {
+            const localPath = path.join(process.cwd(), 'server', slideData.imageUrl.replace(/^\//, ''));
+            if (fs.existsSync(localPath)) {
+              const fileBuffer = fs.readFileSync(localPath);
+              const optimizedBuffer = await this._optimizeImageBuffer(fileBuffer);
+              const b64 = optimizedBuffer.toString('base64');
+              imageDataUri = `data:image/jpeg;base64,${b64}`;
+            }
+          } catch (err) {
+            console.warn('⚠️ Failed to read local upload for PPTX:', err.message);
+          }
         }
 
         // Route to the right builder based on layout/slide_type
         const sType = slideData.slide_type || slideData.layout;
         try {
-          if (sType === 'title' || slideData.layout === 'title' || slideData.layout === 'full-bleed-image') {
+          if (slideData.layout === 'full-bleed-image') {
+            this._buildFullBleedImageSlide(slide, imageDataUri);
+          } else if (sType === 'title' || slideData.layout === 'title') {
             this._buildTitleSlide(slide, slideData, t, font, bodyFont, isUrdu, imageDataUri, pptx, masterBackgroundDataUri);
           } else if (sType === 'section-divider' || slideData.layout === 'section-divider') {
             this._buildSectionDivider(slide, slideData, t, font, bodyFont, isUrdu, pptx, masterBackgroundDataUri);
@@ -256,13 +284,73 @@ class ExportService {
     }
   }
 
+  // Optimize image with sharp: resize, convert to JPEG, compress
+  async _optimizeImageBuffer(buffer) {
+    try {
+      // Resize to max 1920×1080, convert to JPEG with 85% quality
+      const optimized = await sharp(buffer)
+        .resize(1920, 1080, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 85, progressive: true })
+        .toBuffer();
+      return optimized;
+    } catch (err) {
+      console.warn('⚠️ Image optimization failed, using original:', err.message);
+      return buffer; // Fall back to original on error
+    }
+  }
+
+  _addBulletList(slide, bullets, opts) {
+    const cleanBullets = (Array.isArray(bullets) ? bullets : [])
+      .map(item => String(item || '').trim())
+      .filter(Boolean);
+    if (cleanBullets.length === 0) return;
+
+    const {
+      x, y, w, h, fontFace, fontSize, textColor, accentColor,
+      bulletIcon, isUrdu, lineSpacing = 0.55,
+    } = opts;
+    const rowHeight = Math.min(lineSpacing, h / Math.max(cleanBullets.length, 1));
+
+    cleanBullets.forEach((bullet, idx) => {
+      const text = isUrdu ? `${bullet} ${bulletIcon}` : `${bulletIcon} ${bullet}`;
+      slide.addText(text, {
+        x,
+        y: y + idx * rowHeight,
+        w,
+        h: rowHeight,
+        fontSize,
+        fontFace,
+        color: textColor,
+        rtlMode: isUrdu,
+        align: isUrdu ? 'right' : 'left',
+        fit: 'shrink',
+        margin: 0.04,
+        breakLine: false,
+      });
+    });
+  }
+
+  _buildFullBleedImageSlide(slide, imgDataUri) {
+    if (imgDataUri) {
+      try {
+        slide.addImage({
+          data: imgDataUri,
+          x: 0, y: 0, w: '100%', h: '100%',
+          sizing: { type: 'cover' },
+        });
+      } catch (err) {
+        console.warn('⚠️ Failed to add full-bleed image to slide:', err.message);
+      }
+    }
+  }
+
   // --- Title Slide ---
   _buildTitleSlide(slide, data, t, font, bodyFont, isUrdu, imgDataUri, pptx, masterBgDataUri) {
     if (masterBgDataUri) {
       slide.background = { data: masterBgDataUri };
     } else {
       const bgColor = t?.titleBgGrad?.color1 || '6C63FF';
-      slide.background = { fill: { type: 'solid', color: bgColor } };
+      slide.background = { color: bgColor };
     }
 
     // Gradient overlay shape (full slide)
@@ -305,36 +393,38 @@ class ExportService {
     // Main title
     slide.addText(data.heading, {
       x: 1.2, y: 1.8, w: 10.9, h: 2.5,
-      fontSize: 44, fontFace: font,
+      fontSize: t?.headingSize || 48, fontFace: font,
       color: 'FFFFFF', bold: true,
       align: isUrdu ? 'right' : 'left',
       rtlMode: isUrdu,
       valign: 'bottom',
-      shadow: { type: 'outer', blur: 6, offset: 2, color: '000000', opacity: 0.3 },
+      shadow: { type: 'outer', blur: 8, offset: 2, color: '000000', opacity: 0.4 },
+      lineSpacingMultiple: 1.2,
     });
 
     // Subtitle / content
     if (data.content) {
       slide.addText(data.content, {
         x: 1.2, y: 4.5, w: 10.9, h: 1.2,
-        fontSize: 20, fontFace: bodyFont,
-        color: 'DDDDEE', align: isUrdu ? 'right' : 'left',
+        fontSize: t?.bodySize || 18, fontFace: bodyFont,
+        color: 'E5E7EB', align: isUrdu ? 'right' : 'left',
         rtlMode: isUrdu,
+        lineSpacingMultiple: 1.3,
       });
     }
 
     // Bottom accent line
     const lineColor = t?.accent2 || 'FF6B6B';
     slide.addShape(pptx.ShapeType.rect, {
-      x: 1.2, y: 4.2, w: 2.5, h: 0.06,
+      x: 1.2, y: 4.2, w: 3, h: 0.08,
       fill: { type: 'solid', color: lineColor },
     });
 
     // "Powered by" label
     slide.addText('Powered by SlideEdge AI', {
       x: 0, y: 6.8, w: '100%', h: 0.4,
-      fontSize: 9, fontFace: bodyFont,
-      color: 'AAAACC', align: 'center',
+      fontSize: 10, fontFace: bodyFont,
+      color: 'C4C7CB', align: 'center',
     });
   }
 
@@ -348,112 +438,146 @@ class ExportService {
       slide.background = { color: bgColor };
     }
 
-    // Top accent bar
+    // Top accent bar (thicker, more prominent)
     const accentColor = t?.accentColor || '6C63FF';
     slide.addShape(pptx.ShapeType.rect, {
-      x: 0, y: 0, w: '100%', h: 0.06,
+      x: 0, y: 0, w: '100%', h: 0.08,
       fill: { type: 'solid', color: accentColor },
     });
 
-    // Left accent strip
+    // Left accent strip (bolder)
     slide.addShape(pptx.ShapeType.rect, {
-      x: 0, y: 0, w: 0.08, h: '100%',
+      x: 0, y: 0, w: 0.12, h: '100%',
       fill: { type: 'solid', color: accentColor },
     });
 
-    // Decorative corner shape (top-right)
+    // Decorative corner shape (top-right) - more visible
     slide.addShape(pptx.ShapeType.rect, {
-      x: 12.2, y: 0, w: 1.2, h: 0.8,
-      fill: { type: 'solid', color: accentColor, transparency: 90 },
-      rectRadius: 0,
+      x: 12.2, y: 0, w: 1.2, h: 1.0,
+      fill: { type: 'solid', color: accentColor, transparency: 85 },
     });
 
-    const hasImage = imgDataUri && (data.layout === 'image-right' || data.layout === 'image-left' || data.layout === 'content');
-    const textAreaWidth = hasImage ? 7.2 : 11.5;
-    const textAreaX = 0.8;
+    const normalizedLayout = String(data.layout || '').toLowerCase();
+    const isSideBySideLayout = [
+      'two column layout',
+      'image left layout',
+      'image right layout',
+      'image-left',
+      'image-right',
+      'text-left-image-right',
+      'image-left-text-right',
+      'chart-left-text-right',
+      'split-stats',
+      'content',
+    ].includes(normalizedLayout);
+    const imageOnLeft = ['image left layout', 'image-left', 'image-left-text-right'].includes(normalizedLayout);
+    const hasImage = !!imgDataUri && isSideBySideLayout;
+    const textAreaWidth = hasImage ? 5.8 : 11.2;
+    const textAreaX = hasImage && imageOnLeft ? 6.85 : 0.9;
 
-    // Heading with accent underline
+    // Heading with better spacing
     const headingColor = t?.headingColor || '1E1E2E';
     slide.addText(data.heading, {
-      x: textAreaX, y: 0.4, w: textAreaWidth, h: 0.9,
-      fontSize: 30, fontFace: font,
+      x: textAreaX, y: 0.5, w: textAreaWidth, h: 1.0,
+      fontSize: t?.headingSize || 32, fontFace: font,
       color: headingColor, bold: true,
       rtlMode: isUrdu,
       align: isUrdu ? 'right' : 'left',
+      lineSpacingMultiple: 1.1,
     });
 
-    // Heading underline
-    const underlineColor = t?.accentColor || '6C63FF';
+    // Improved heading underline (wider, bolder)
+    const underlineColor = t?.accent2 || t?.accentColor || '6C63FF';
     slide.addShape(pptx.ShapeType.rect, {
-      x: textAreaX, y: 1.25, w: 1.8, h: 0.05,
+      x: textAreaX, y: 1.6, w: 2.5, h: 0.08,
       fill: { type: 'solid', color: underlineColor },
     });
 
-    // Content paragraph
-    let bulletStartY = 1.6;
-    if (data.content) {
-      const textColor = t?.textColor || '555555';
-      slide.addText(data.content, {
-        x: textAreaX, y: 1.5, w: textAreaWidth, h: 1.0,
-        fontSize: 14, fontFace: bodyFont,
-        color: textColor,
-        rtlMode: isUrdu,
-        align: isUrdu ? 'right' : 'left',
-        lineSpacingMultiple: 1.4,
-      });
-      bulletStartY = 2.6;
-    }
-
-    // Bullet points — styled with icons
-    if (data.bullets && data.bullets.length > 0) {
-      const bulletIcon = t?.bulletIcon || '●';
-      const bulletAccentColor = t?.accentColor || '6C63FF';
-      const bulletTextColor = t?.textColor || '555555';
-      const bulletRows = data.bullets.map((b, idx) => ([
-        {
-          text: `${bulletIcon} `,
-          options: {
-            fontSize: 15, fontFace: bodyFont,
-            color: bulletAccentColor, bold: true,
-          },
-        },
-        {
-          text: b,
-          options: {
-            fontSize: 15, fontFace: bodyFont,
-            color: bulletTextColor, breakLine: true,
-          },
-        },
-      ]));
-
-      slide.addText(bulletRows, {
-        x: textAreaX + 0.2, y: bulletStartY, w: textAreaWidth - 0.4, h: 4.2,
-        valign: 'top',
-        rtlMode: isUrdu,
-        lineSpacingMultiple: 1.8,
-        paraSpaceAfter: 8,
-      });
-    }
-
-    // Image on the right side
     if (hasImage && imgDataUri) {
+      const imageX = imageOnLeft ? 0.95 : 8.2;
+      const imageBorderX = imageOnLeft ? 1.1 : 8.35;
+      const imageText = imageOnLeft ? 6.85 : 0.9;
+      const imageTextWidth = imageOnLeft ? 5.8 : 5.8;
+
+      // Content paragraph with better sizing
+      let bulletStartY = 2.0;
+      if (data.content) {
+        const textColor = t?.textColor || '555555';
+        slide.addText(data.content, {
+          x: imageText, y: 1.8, w: imageTextWidth, h: 0.9,
+          fontSize: t?.bodySize || 14, fontFace: bodyFont,
+          color: textColor,
+          rtlMode: isUrdu,
+          align: isUrdu ? 'right' : 'left',
+          lineSpacingMultiple: t?.lineHeight || 1.5,
+        });
+        bulletStartY = 2.9;
+      }
+
+      // Bullet points — styled with better spacing
+      if (data.bullets && data.bullets.length > 0) {
+        const bulletIcon = t?.bulletIcon || '▸';
+        const bulletAccentColor = t?.accent2 || t?.accentColor || '6C63FF';
+        const bulletTextColor = t?.textColor || '555555';
+        this._addBulletList(slide, data.bullets, {
+          x: imageText + 0.3, y: bulletStartY, w: imageTextWidth - 0.5, h: 3.8,
+          fontFace: bodyFont,
+          fontSize: t?.bodySize || 14,
+          textColor: bulletTextColor,
+          accentColor: bulletAccentColor,
+          bulletIcon,
+          isUrdu,
+        });
+      }
+
       try {
         slide.addImage({
           data: imgDataUri,
-          x: 8.4, y: 0.6, w: 4.5, h: 3.4,
+          x: imageX, y: 0.8, w: 4.7, h: 3.5,
           rounding: true,
           sizing: { type: 'cover' },
-          shadow: { type: 'outer', blur: 8, offset: 3, color: '000000', opacity: 0.15 },
+          shadow: { type: 'outer', blur: 10, offset: 3, color: '000000', opacity: 0.2 },
         });
-        // Accent border for image
+        // Accent border for image (thicker)
         const imgBorderColor = t?.accentColor || '6C63FF';
         slide.addShape(pptx.ShapeType.rect, {
-          x: 8.35, y: 0.55, w: 4.6, h: 3.5,
+          x: imageBorderX, y: 0.55, w: 4.6, h: 3.5,
           line: { color: imgBorderColor, width: 1.5 },
           fill: { type: 'none' },
           rectRadius: 0.15,
         });
       } catch { /* skip broken images */ }
+    } else {
+      // Content paragraph with better sizing
+      let bulletStartY = 2.0;
+      if (data.content) {
+        const textColor = t?.textColor || '555555';
+        slide.addText(data.content, {
+          x: textAreaX, y: 1.8, w: textAreaWidth, h: 0.9,
+          fontSize: t?.bodySize || 14, fontFace: bodyFont,
+          color: textColor,
+          rtlMode: isUrdu,
+          align: isUrdu ? 'right' : 'left',
+          lineSpacingMultiple: t?.lineHeight || 1.5,
+        });
+        bulletStartY = 2.9;
+      }
+
+      // Bullet points — styled with better spacing
+      if (data.bullets && data.bullets.length > 0) {
+        const bulletIcon = t?.bulletIcon || '▸';
+        const bulletAccentColor = t?.accent2 || t?.accentColor || '6C63FF';
+        const bulletTextColor = t?.textColor || '555555';
+        this._addBulletList(slide, data.bullets, {
+          x: textAreaX + 0.3, y: bulletStartY, w: textAreaWidth - 0.5, h: 3.8,
+          fontFace: bodyFont,
+          fontSize: t?.bodySize || 14,
+          textColor: bulletTextColor,
+          accentColor: bulletAccentColor,
+          bulletIcon,
+          isUrdu,
+        });
+      }
     }
 
     // Footer bar
@@ -463,20 +587,20 @@ class ExportService {
       fill: { type: 'solid', color: footerBg },
     });
 
-    // Slide number
-    const footerAccentColor = t?.accentColor || '6C63FF';
+    // Slide number with better color
+    const footerAccentColor = t?.accent2 || t?.accentColor || '6C63FF';
     slide.addText(`${slideNum} / ${totalSlides}`, {
       x: 11.8, y: 7.05, w: 1.3, h: 0.4,
-      fontSize: 10, fontFace: bodyFont,
+      fontSize: 11, fontFace: bodyFont,
       color: footerAccentColor, align: 'right',
       bold: true,
     });
 
-    // Footer branding
+    // Footer branding with better styling
     slide.addText('SlideEdge AI', {
       x: 0.5, y: 7.05, w: 3, h: 0.4,
-      fontSize: 9, fontFace: bodyFont,
-      color: t.textColor, align: 'left',
+      fontSize: 10, fontFace: bodyFont,
+      color: t.headingColor, align: 'left',
       italic: true,
     });
   }
@@ -487,34 +611,35 @@ class ExportService {
       slide.background = { data: masterBgDataUri };
     } else {
       const bgColor = t?.accentColor || '6C63FF';
-      slide.background = { fill: { type: 'solid', color: bgColor } };
+      slide.background = { color: bgColor };
     }
 
-    // Gradient overlay
+    // Gradient overlay (more subtle)
     const overlayColor = t?.accent2 || 'FF6B6B';
     slide.addShape(pptx.ShapeType.rect, {
       x: 0, y: 0, w: '100%', h: '100%',
-      fill: { type: 'solid', color: overlayColor, transparency: 70 },
+      fill: { type: 'solid', color: overlayColor, transparency: 65 },
     });
 
-    // Decorative shapes
+    // Decorative shapes (improved positioning)
     slide.addShape(pptx.ShapeType.ellipse, {
-      x: -2, y: -2, w: 6, h: 6,
-      fill: { type: 'solid', color: 'FFFFFF', transparency: 92 },
+      x: -1.5, y: -1.5, w: 5.5, h: 5.5,
+      fill: { type: 'solid', color: 'FFFFFF', transparency: 88 },
     });
     slide.addShape(pptx.ShapeType.ellipse, {
-      x: 10, y: 4, w: 5, h: 5,
-      fill: { type: 'solid', color: 'FFFFFF', transparency: 92 },
+      x: 10.2, y: 4.2, w: 5, h: 5,
+      fill: { type: 'solid', color: 'FFFFFF', transparency: 88 },
     });
 
-    // Section title
+    // Section title (improved)
     slide.addText(data.heading, {
-      x: 1.5, y: 2.4, w: 10.3, h: 2,
-      fontSize: 40, fontFace: font,
+      x: 1.5, y: 2.2, w: 10.3, h: 2.2,
+      fontSize: t?.headingSize || 44, fontFace: font,
       color: 'FFFFFF', bold: true,
       align: isUrdu ? 'right' : 'center',
       rtlMode: isUrdu,
-      shadow: { type: 'outer', blur: 6, offset: 2, color: '000000', opacity: 0.2 },
+      shadow: { type: 'outer', blur: 8, offset: 2, color: '000000', opacity: 0.3 },
+      lineSpacingMultiple: 1.1,
     });
 
     // Subtitle line
@@ -610,14 +735,15 @@ class ExportService {
 
     // Bullet points below
     if (data.bullets && data.bullets.length > 0) {
-      const bulletRows = data.bullets.map(b => ([
-        { text: `${t.bulletIcon} `, options: { fontSize: 14, fontFace: bodyFont, color: t.accentColor, bold: true } },
-        { text: b, options: { fontSize: 14, fontFace: bodyFont, color: t.textColor, breakLine: true } },
-      ]));
-      slide.addText(bulletRows, {
+      this._addBulletList(slide, data.bullets, {
         x: 1.0, y: 5.0, w: 11.3, h: 1.8,
-        valign: 'top', rtlMode: isUrdu,
-        lineSpacingMultiple: 1.6,
+        fontFace: bodyFont,
+        fontSize: 14,
+        textColor: t.textColor,
+        accentColor: t.accentColor,
+        bulletIcon: t.bulletIcon,
+        isUrdu,
+        lineSpacing: 0.42,
       });
     }
 

@@ -31,6 +31,11 @@ export const presentationService = {
     return res.data;
   },
 
+  async fetchSlideImage(presentationId, slideIndex) {
+    const res = await api.post(`/presentations/${presentationId}/slides/${slideIndex}/fetch-image`);
+    return res.data;
+  },
+
   // Export URLs - token passed as query param because browser window.open can't send headers
   getExportPPTXUrl(id) {
     const base = API_BASE.startsWith('http') ? API_BASE : `${window.location.origin}${API_BASE}`;
@@ -87,6 +92,25 @@ export const presentationService = {
     const a = document.createElement('a');
     a.href = url;
     a.download = `${(payload?.title || 'presentation').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  async exportToGoogle(presentationId) {
+    const res = await api.post(`/presentations/${presentationId}/export/google`);
+    return res.data;
+  },
+
+  async previewDownloadPPTX(presentationId, templateData) {
+    const res = await api.post(`/presentations/${presentationId}/preview/export/pptx`, { templateData }, {
+      responseType: 'blob',
+      timeout: 120000,
+    });
+    const url = URL.createObjectURL(res.data);
+    const filename = `${(templateData?.name || 'presentation')}_preview.pptx`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   },

@@ -14,10 +14,10 @@ import presentationRoutes from './routes/presentationRoutes.js';
 import contactRoutes from './routes/contactRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
-dotenv.config({ path: '../.env' });
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const app = express();
 function resolvePort(rawPort) {
@@ -98,6 +98,17 @@ app.use(cors({
       return;
     }
 
+    // Allow local development origins regardless of port
+    try {
+      const url = new URL(origin);
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+        callback(null, true);
+        return;
+      }
+    } catch {
+      // ignore malformed origin and continue checks below
+    }
+
     if (allowNetlifyPreview) {
       try {
         const hostname = new URL(origin).hostname;
@@ -110,11 +121,8 @@ app.use(cors({
       }
     }
 
-    if (!origin) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    // Do not throw here; returning false avoids converting CORS denials into 500 errors.
+    callback(null, false);
   },
   credentials: true,
 }));
@@ -132,6 +140,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/presentations', presentationRoutes);
 app.use('/api/contact', contactRoutes);
+
+// Serve uploaded images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health Check
 app.get('/api/health', (req, res) => {

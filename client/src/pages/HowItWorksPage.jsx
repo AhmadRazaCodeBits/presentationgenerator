@@ -73,8 +73,8 @@ export default function HowItWorksPage() {
           marginBottom: 60,
         }} className="steps-grid">
           {/* Visual Side */}
-          <div style={{
-            background: STEPS[activeStep].color, padding: 48,
+          <div className="steps-visual" style={{
+            background: STEPS[activeStep].color,
             display: 'flex', flexDirection: 'column', justifyContent: 'center',
             alignItems: 'center', color: 'white', transition: 'background 0.5s',
           }}>
@@ -90,7 +90,7 @@ export default function HowItWorksPage() {
           </div>
 
           {/* Content Side */}
-          <div style={{ padding: 48, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div className="steps-content" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             {/* Progress Bar */}
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 32, position: 'relative' }}>
               <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 3, background: 'var(--border-light)', transform: 'translateY(-50%)' }}>
@@ -149,7 +149,7 @@ export default function HowItWorksPage() {
         <div style={{ maxWidth: 700, margin: '0 auto 48px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           {COMPARISONS.map((c, i) => (
             <div key={i} className="card-flat" style={{ padding: '20px 24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div className="comparison-header">
                 <h4 style={{ fontWeight: 700 }}>{c.task}</h4>
                 <div style={{ display: 'flex', gap: 16, fontSize: '0.85rem' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Traditional: {c.trad}min</span>
@@ -170,10 +170,7 @@ export default function HowItWorksPage() {
 
         {/* Save 90% */}
         <div style={{ textAlign: 'center', marginBottom: 60 }}>
-          <div style={{
-            display: 'inline-block', background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
-            border: '2px solid #86efac', borderRadius: 'var(--radius-xl)', padding: '24px 48px',
-          }}>
+          <div className="save-time-banner">
             <h3 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#16a34a', marginBottom: 4 }}>Save 90% Time</h3>
             <p style={{ color: 'var(--text-secondary)' }}>Create presentations in <strong style={{ color: '#16a34a' }}>minutes</strong> instead of <s>hours</s></p>
           </div>
@@ -206,12 +203,7 @@ export default function HowItWorksPage() {
         </div>
 
         {/* Final CTA */}
-        <div style={{
-          background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
-          borderRadius: 'var(--radius-xl)', padding: '64px 48px',
-          textAlign: 'center', color: 'white', marginBottom: 60,
-          position: 'relative', overflow: 'hidden',
-        }}>
+        <div className="cta-banner">
           <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: 200, height: 200, background: 'rgba(255,255,255,0.1)', borderRadius: '50%', filter: 'blur(60px)' }} />
           <h2 style={{ fontSize: '2.5rem', fontWeight: 900, marginBottom: 12, color: 'white', position: 'relative', zIndex: 2 }}>
             Ready to Create Your First Presentation?
@@ -226,8 +218,44 @@ export default function HowItWorksPage() {
       </div>
 
       <style>{`
+        .steps-visual, .steps-content {
+          padding: 48px;
+        }
+        .comparison-header {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 12px;
+        }
+        .save-time-banner {
+          display: inline-block;
+          background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+          border: 2px solid #86efac;
+          border-radius: var(--radius-xl);
+          padding: 24px 48px;
+        }
+        .cta-banner {
+          background: linear-gradient(135deg, var(--primary), var(--secondary));
+          border-radius: var(--radius-xl);
+          padding: 64px 48px;
+          text-align: center;
+          color: white;
+          margin-bottom: 60px;
+          position: relative;
+          overflow: hidden;
+        }
         @media (max-width: 1024px) {
           .steps-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 768px) {
+          .steps-visual, .steps-content { padding: 24px; }
+          .save-time-banner { padding: 16px 24px; }
+          .cta-banner { padding: 40px 24px; }
+        }
+        @media (max-width: 480px) {
+          .comparison-header {
+            flex-direction: column;
+            gap: 6px;
+          }
         }
       `}</style>
     </div>

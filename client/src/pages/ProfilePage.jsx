@@ -86,7 +86,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Tabs */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 16 }}>
+            <div className="profile-tabs-sidebar" style={{ display: 'flex', gap: 4, marginTop: 16 }}>
               {tabs.map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                   style={{
@@ -106,7 +106,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Content */}
-          <div className="card-flat" style={{ padding: 32 }}>
+          <div className="card-flat profile-content-card" style={{ padding: 32 }}>
             {activeTab === 'profile' && (
               <form onSubmit={handleProfileUpdate}>
                 <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: 24 }}>
@@ -206,8 +206,24 @@ export default function ProfilePage() {
       </div>
 
       <style>{`
-        @media (max-width: 768px) {
+        .profile-tabs-sidebar {
+          flex-direction: column;
+        }
+        @media (max-width: 992px) {
           .profile-grid { grid-template-columns: 1fr !important; }
+          .profile-tabs-sidebar {
+            flex-direction: row !important;
+            margin-bottom: 16px;
+          }
+          .profile-tabs-sidebar button {
+            flex: 1;
+            justify-content: center;
+          }
+        }
+        @media (max-width: 768px) {
+          .profile-content-card {
+            padding: 20px !important;
+          }
         }
       `}</style>
     </div>

@@ -16,11 +16,12 @@ import ContactPage from './pages/ContactPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import PresentationEditorPage from './pages/PresentationEditorPage';
+import QuickEditorPage from './pages/QuickEditorPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function AppContent() {
   const location = useLocation();
-  const noFooterPages = ['/chatbot', '/dashboard', '/profile', '/editor'];
+  const noFooterPages = ['/chatbot', '/dashboard', '/profile', '/editor', '/quick-editor'];
   const showFooter = !noFooterPages.some(p => location.pathname.startsWith(p));
 
   return (
@@ -31,6 +32,7 @@ function AppContent() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/quick-editor" element={<QuickEditorPage />} />
           <Route path="/chatbot" element={<ChatbotPage />} />
           <Route path="/templates" element={<TemplatesPage />} />
           <Route path="/features" element={<FeaturesPage />} />
